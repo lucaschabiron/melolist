@@ -15,4 +15,4 @@ MeloList is a music tracking and cataloging app — think Letterboxd for albums,
 - **Auth**: Better Auth
 - **Hosting**: Railway
 
-Status: early development. Spec and brand guidelines live in `/docs`.
+Status: early development. No public API yet, but the schema is shaping up. The goal is to have a working MVP by the end of April.
