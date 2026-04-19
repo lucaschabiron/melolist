@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { apiBaseUrl } from "./auth-config";
+import { apiBaseUrl } from "./config";
 
 const sessionEndpoint = new URL("/api/auth/get-session", apiBaseUrl);
 

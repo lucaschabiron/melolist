@@ -1,6 +1,6 @@
 import { createAuthClient } from "better-auth/react";
 import { usernameClient } from "better-auth/client/plugins";
-import { apiBaseUrl } from "../../lib/auth-config";
+import { apiBaseUrl } from "../../lib/config";
 
 export const authClient = createAuthClient({
     baseURL: apiBaseUrl,

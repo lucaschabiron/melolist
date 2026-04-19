@@ -2,18 +2,11 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { api } from "../lib/api";
 import { signOut, useSession } from "../lib/auth-client";
 
 export default function Home() {
     const router = useRouter();
     const { data: session, isPending } = useSession();
-
-    const handleFetch = async () => {
-        const { data, error } = await api.user.get();
-        if (error) return console.error(error);
-        console.log(data);
-    };
 
     const handleSignOut = async () => {
         await signOut();
@@ -47,13 +40,6 @@ export default function Home() {
                 <p className="text-caption text-steel mb-8">
                     {session.user.email}
                 </p>
-
-                <button
-                    onClick={handleFetch}
-                    className="bg-paper text-ink rounded-sm text-body font-medium px-4 py-2 transition-opacity duration-[120ms] hover:opacity-[0.92] tracking-[-0.01em]"
-                >
-                    Fetch users
-                </button>
             </main>
         </div>
     );
