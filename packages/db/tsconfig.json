@@ -1,0 +1,8 @@
+{
+    "compilerOptions": {
+        "strictNullChecks": true,
+        "strict": true
+    },
+    "include": ["**/*.ts", "**/*.tsx"],
+    "exclude": ["node_modules"]
+}
