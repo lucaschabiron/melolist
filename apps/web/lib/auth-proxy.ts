@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { authApiBaseUrl } from "./auth-config";
+import { apiBaseUrl } from "./auth-config";
 
-const sessionEndpoint = new URL("/get-session", authApiBaseUrl);
+const sessionEndpoint = new URL("/api/auth/get-session", apiBaseUrl);
 
 type SessionResponse =
     | {
