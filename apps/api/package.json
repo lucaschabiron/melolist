@@ -1,0 +1,21 @@
+{
+    "name": "@melolist/api",
+    "version": "0.1.0",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "dev": "bun run --watch src/index.ts"
+    },
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "dependencies": {
+        "@elysiajs/cors": "^1.4.1",
+        "@melolist/db": "workspace:*",
+        "better-auth": "^1.6.5",
+        "elysia": "latest"
+    },
+    "devDependencies": {
+        "bun-types": "latest"
+    },
+    "module": "src/index.js"
+}
