@@ -8,6 +8,18 @@ export const auth = betterAuth({
     emailAndPassword: { enabled: true },
     plugins: [username()],
     trustedOrigins: [process.env.APP_URL ?? "http://localhost:3001"],
+    advanced: process.env.COOKIE_DOMAIN
+        ? {
+              crossSubDomainCookies: {
+                  enabled: true,
+                  domain: process.env.COOKIE_DOMAIN,
+              },
+              defaultCookieAttributes: {
+                  sameSite: "lax",
+                  secure: true,
+              },
+          }
+        : undefined,
     databaseHooks: {
         user: {
             create: {
