@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { authClient, signUp } from "../../lib/auth-client";
+import { signUp } from "../../lib/auth-client";
 
 type FieldErrors = {
     username?: string;
@@ -18,9 +18,7 @@ export default function SignupPage() {
     const [password, setPassword] = useState("");
     const [errors, setErrors] = useState<FieldErrors>({});
     const [loading, setLoading] = useState(false);
-    const [sent, setSent] = useState(false);
-    const [resending, setResending] = useState(false);
-    const [resendMessage, setResendMessage] = useState<string | null>(null);
+    const [submitted, setSubmitted] = useState(false);
 
     const callbackURL =
         typeof window === "undefined"
@@ -62,25 +60,7 @@ export default function SignupPage() {
             setErrors({ form: error.message ?? "Sign up failed." });
             return;
         }
-        setResendMessage(null);
-        setSent(true);
-    };
-
-    const handleResendVerification = async () => {
-        setResending(true);
-        setResendMessage(null);
-
-        const { error } = await authClient.sendVerificationEmail({
-            email,
-            callbackURL,
-        });
-
-        setResending(false);
-        setResendMessage(
-            error
-                ? error.message ?? "Could not resend the verification email."
-                : "Verification email sent again.",
-        );
+        setSubmitted(true);
     };
 
     return (
@@ -96,32 +76,37 @@ export default function SignupPage() {
                     />
                 </div>
 
-                {sent ? (
+                {submitted ? (
                     <div className="text-center py-8">
                         <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center mx-auto mb-4">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f7f7f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <rect x="2" y="4" width="20" height="16" rx="2" />
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#f7f7f7"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <rect
+                                    x="2"
+                                    y="4"
+                                    width="20"
+                                    height="16"
+                                    rx="2"
+                                />
                                 <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                             </svg>
                         </div>
-                        <h2 className="text-h3 font-medium text-paper mb-2">Check your email</h2>
+                        <h2 className="text-h3 font-medium text-paper mb-2">
+                            Check your email or sign in
+                        </h2>
                         <p className="text-caption text-steel leading-[1.5] mb-6">
-                            We sent a verification link to <span className="text-paper">{email}</span>.
-                            <br />Click it to activate your account.
+                            If this address can be used to create an account, a
+                            verification link will arrive shortly. If you
+                            already have an account, sign in instead.
                         </p>
-                        <button
-                            type="button"
-                            onClick={handleResendVerification}
-                            disabled={resending}
-                            className="text-caption text-paper hover:opacity-70 transition-opacity duration-[120ms] disabled:opacity-40"
-                        >
-                            {resending ? "Sending again…" : "Resend verification email"}
-                        </button>
-                        {resendMessage && (
-                            <div className="text-micro text-paper/60 mt-3">
-                                {resendMessage}
-                            </div>
-                        )}
                         <Link
                             href="/login"
                             className="text-caption text-steel hover:text-paper transition-colors duration-120 block mt-6"
@@ -130,89 +115,95 @@ export default function SignupPage() {
                         </Link>
                     </div>
                 ) : (
-                <form onSubmit={handleSubmit} noValidate>
-                    <h1 className="text-h3 font-medium text-paper mb-2 tracking-[-0.01em]">
-                        Create account
-                    </h1>
-                    <p className="text-caption text-steel mb-8 leading-[1.4]">
-                        Start cataloguing your music.
-                    </p>
+                    <form onSubmit={handleSubmit} noValidate>
+                        <h1 className="text-h3 font-medium text-paper mb-2 tracking-[-0.01em]">
+                            Create account
+                        </h1>
+                        <p className="text-caption text-steel mb-8 leading-[1.4]">
+                            Start cataloguing your music.
+                        </p>
 
-                    <Field
-                        id="username"
-                        label="Username"
-                        type="text"
-                        autoComplete="username"
-                        placeholder="janedoe"
-                        value={username}
-                        error={errors.username}
-                        onChange={(v) => {
-                            setUsername(v);
-                            setErrors((er) => ({
-                                ...er,
-                                username: undefined,
-                            }));
-                        }}
-                    />
+                        <Field
+                            id="username"
+                            label="Username"
+                            type="text"
+                            autoComplete="username"
+                            placeholder="janedoe"
+                            value={username}
+                            error={errors.username}
+                            onChange={(v) => {
+                                setUsername(v);
+                                setErrors((er) => ({
+                                    ...er,
+                                    username: undefined,
+                                }));
+                            }}
+                        />
 
-                    <Field
-                        id="email"
-                        label="Email"
-                        type="email"
-                        autoComplete="email"
-                        placeholder="you@example.com"
-                        value={email}
-                        error={errors.email}
-                        onChange={(v) => {
-                            setEmail(v);
-                            setErrors((er) => ({ ...er, email: undefined }));
-                        }}
-                    />
+                        <Field
+                            id="email"
+                            label="Email"
+                            type="email"
+                            autoComplete="email"
+                            placeholder="you@example.com"
+                            value={email}
+                            error={errors.email}
+                            onChange={(v) => {
+                                setEmail(v);
+                                setErrors((er) => ({
+                                    ...er,
+                                    email: undefined,
+                                }));
+                            }}
+                        />
 
-                    <Field
-                        id="password"
-                        label="Password"
-                        type="password"
-                        autoComplete="new-password"
-                        placeholder="••••••••"
-                        value={password}
-                        error={errors.password}
-                        onChange={(v) => {
-                            setPassword(v);
-                            setErrors((er) => ({ ...er, password: undefined }));
-                        }}
-                    />
+                        <Field
+                            id="password"
+                            label="Password"
+                            type="password"
+                            autoComplete="new-password"
+                            placeholder="••••••••"
+                            value={password}
+                            error={errors.password}
+                            onChange={(v) => {
+                                setPassword(v);
+                                setErrors((er) => ({
+                                    ...er,
+                                    password: undefined,
+                                }));
+                            }}
+                        />
 
-                    {errors.form && (
-                        <div className="text-micro text-paper/60 mb-3">
-                            {errors.form}
-                        </div>
-                    )}
+                        {errors.form && (
+                            <div className="text-micro text-paper/60 mb-3">
+                                {errors.form}
+                            </div>
+                        )}
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-paper text-ink rounded-sm text-body font-medium py-3 mt-2 transition-opacity duration-[120ms] hover:opacity-[0.92] active:opacity-[0.85] disabled:opacity-40 disabled:cursor-default tracking-[-0.01em]"
-                    >
-                        {loading ? "Creating account…" : "Create account"}
-                    </button>
-
-                    <div className="flex items-center gap-3 my-6">
-                        <hr className="flex-1 h-px border-0 bg-[var(--hairline)]" />
-                        <span className="text-caption text-steel">or</span>
-                        <hr className="flex-1 h-px border-0 bg-[var(--hairline)]" />
-                    </div>
-
-                    <div className="text-center text-caption text-steel">
-                        Already have an account?{" "}
-                        <Link
-                            href="/login"
-                            className="text-paper hover:opacity-70 transition-opacity duration-[120ms]"
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-paper text-ink rounded-sm text-body font-medium py-3 mt-2 transition-opacity duration-[120ms] hover:opacity-[0.92] active:opacity-[0.85] disabled:opacity-40 disabled:cursor-default tracking-[-0.01em]"
                         >
-                            Sign in
-                        </Link>
-                    </div>
-                </form>
+                            {loading ? "Creating account…" : "Create account"}
+                        </button>
+
+                        <div className="flex items-center gap-3 my-6">
+                            <hr className="flex-1 h-px border-0 bg-[var(--hairline)]" />
+                            <span className="text-caption text-steel">or</span>
+                            <hr className="flex-1 h-px border-0 bg-[var(--hairline)]" />
+                        </div>
+
+                        <div className="text-center text-caption text-steel">
+                            Already have an account?{" "}
+                            <Link
+                                href="/login"
+                                className="text-paper hover:opacity-70 transition-opacity duration-[120ms]"
+                            >
+                                Sign in
+                            </Link>
+                        </div>
+                    </form>
                 )}
             </div>
         </div>

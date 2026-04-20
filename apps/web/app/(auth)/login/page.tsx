@@ -71,7 +71,7 @@ export default function LoginPage() {
         setResending(false);
         setResendMessage(
             error
-                ? error.message ?? "Could not resend the verification email."
+                ? (error.message ?? "Could not resend the verification email.")
                 : "Verification email sent again.",
         );
     };

@@ -1,5 +1,8 @@
 import { betterAuth } from "better-auth";
-import { createAuthMiddleware, createEmailVerificationToken } from "better-auth/api";
+import {
+    createAuthMiddleware,
+    createEmailVerificationToken,
+} from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { username } from "better-auth/plugins";
 import { db, userProfileTable } from "@melolist/db";
@@ -22,10 +25,8 @@ type ExistingUser = {
 async function sendEmail(to: string, subject: string, html: string) {
     const key = process.env.MAILJET_API_KEY;
     const secret = process.env.MAILJET_SECRET_KEY;
-    console.log("[mailjet] sending to", to, "key?", !!key, "secret?", !!secret);
     if (!key || !secret) {
-        console.error("[mailjet] missing credentials — aborting send");
-        return;
+        throw new Error("Verification email delivery is not configured.");
     }
     const res = await fetch("https://api.mailjet.com/v3.1/send", {
         method: "POST",
@@ -44,8 +45,11 @@ async function sendEmail(to: string, subject: string, html: string) {
             ],
         }),
     });
-    const body = await res.text();
-    console.log("[mailjet]", res.status, body);
+    if (!res.ok) {
+        throw new Error(
+            `Verification email delivery failed with status ${res.status}.`,
+        );
+    }
 }
 
 function isExpiredUnverifiedUser(user: ExistingUser) {
@@ -233,15 +237,17 @@ export const auth = betterAuth({
             }
 
             if (typeof ctx.body.username === "string") {
-                const existingUsernameUser = (await ctx.context.adapter.findOne({
-                    model: "user",
-                    where: [
-                        {
-                            field: "username",
-                            value: normalizeUsername(ctx.body.username),
-                        },
-                    ],
-                })) as ExistingUser | null;
+                const existingUsernameUser = (await ctx.context.adapter.findOne(
+                    {
+                        model: "user",
+                        where: [
+                            {
+                                field: "username",
+                                value: normalizeUsername(ctx.body.username),
+                            },
+                        ],
+                    },
+                )) as ExistingUser | null;
 
                 if (
                     existingUsernameUser &&

@@ -4,12 +4,10 @@ import { apiBaseUrl } from "./config";
 
 const sessionEndpoint = new URL("/api/auth/get-session", apiBaseUrl);
 
-type SessionResponse =
-    | {
-          session: Record<string, unknown>;
-          user: Record<string, unknown>;
-      }
-    | null;
+type SessionResponse = {
+    session: Record<string, unknown>;
+    user: Record<string, unknown>;
+} | null;
 
 const appendSetCookieHeaders = (source: Headers, target: Headers) => {
     const headersWithGetSetCookie = source as Headers & {
@@ -41,19 +39,33 @@ const getSession = async (request: NextRequest) => {
     });
 };
 
+const redirectToAuthUnavailable = (request: NextRequest) => {
+    const url = new URL("/auth-unavailable", request.url);
+    url.searchParams.set("from", request.nextUrl.pathname);
+    return NextResponse.redirect(url);
+};
+
 export async function proxy(request: NextRequest) {
     let sessionResponse: Response;
 
     try {
         sessionResponse = await getSession(request);
     } catch {
-        return NextResponse.next();
+        return redirectToAuthUnavailable(request);
     }
 
     let session: SessionResponse = null;
 
+    if (sessionResponse.status >= 500) {
+        return redirectToAuthUnavailable(request);
+    }
+
     if (sessionResponse.ok) {
-        session = (await sessionResponse.json()) as SessionResponse;
+        try {
+            session = (await sessionResponse.json()) as SessionResponse;
+        } catch {
+            return redirectToAuthUnavailable(request);
+        }
     }
 
     const response = session
@@ -64,4 +76,3 @@ export async function proxy(request: NextRequest) {
 
     return response;
 }
-

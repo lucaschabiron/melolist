@@ -7,11 +7,10 @@ MeloList is a music tracking and cataloging app — think Letterboxd for albums,
 ## Stack
 
 - **Monorepo**: Turborepo
-- **Web**: Next.js 15 (App Router), Tailwind 4
+- **Web**: Next.js 16, Tailwind 4
 - **API**: Bun + Elysia
-- **Worker**: Bun + BullMQ (background jobs, MusicBrainz ingestion)
+- **Worker**: Bun
 - **Database**: PostgreSQL + Drizzle
-- **Cache/queue**: Redis
 - **Auth**: Better Auth
 - **Hosting**: Railway
 
