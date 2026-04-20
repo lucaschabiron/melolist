@@ -2,9 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { signUp } from "../../lib/auth-client";
+import { authClient, signUp } from "../../lib/auth-client";
 
 type FieldErrors = {
     username?: string;
@@ -14,12 +13,19 @@ type FieldErrors = {
 };
 
 export default function SignupPage() {
-    const router = useRouter();
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [errors, setErrors] = useState<FieldErrors>({});
     const [loading, setLoading] = useState(false);
+    const [sent, setSent] = useState(false);
+    const [resending, setResending] = useState(false);
+    const [resendMessage, setResendMessage] = useState<string | null>(null);
+
+    const callbackURL =
+        typeof window === "undefined"
+            ? undefined
+            : new URL("/", window.location.origin).toString();
 
     const validate = (): FieldErrors => {
         const e: FieldErrors = {};
@@ -43,13 +49,38 @@ export default function SignupPage() {
             password,
             name: username,
             username,
+            callbackURL,
         });
         setLoading(false);
         if (error) {
+            const errorCode = (error as { code?: string } | null)?.code;
+            if (errorCode === "USERNAME_IS_ALREADY_TAKEN") {
+                setErrors({ username: error.message ?? "Username is taken." });
+                return;
+            }
+
             setErrors({ form: error.message ?? "Sign up failed." });
             return;
         }
-        router.push("/");
+        setResendMessage(null);
+        setSent(true);
+    };
+
+    const handleResendVerification = async () => {
+        setResending(true);
+        setResendMessage(null);
+
+        const { error } = await authClient.sendVerificationEmail({
+            email,
+            callbackURL,
+        });
+
+        setResending(false);
+        setResendMessage(
+            error
+                ? error.message ?? "Could not resend the verification email."
+                : "Verification email sent again.",
+        );
     };
 
     return (
@@ -65,6 +96,40 @@ export default function SignupPage() {
                     />
                 </div>
 
+                {sent ? (
+                    <div className="text-center py-8">
+                        <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center mx-auto mb-4">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f7f7f7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="2" y="4" width="20" height="16" rx="2" />
+                                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                            </svg>
+                        </div>
+                        <h2 className="text-h3 font-medium text-paper mb-2">Check your email</h2>
+                        <p className="text-caption text-steel leading-[1.5] mb-6">
+                            We sent a verification link to <span className="text-paper">{email}</span>.
+                            <br />Click it to activate your account.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={handleResendVerification}
+                            disabled={resending}
+                            className="text-caption text-paper hover:opacity-70 transition-opacity duration-[120ms] disabled:opacity-40"
+                        >
+                            {resending ? "Sending again…" : "Resend verification email"}
+                        </button>
+                        {resendMessage && (
+                            <div className="text-micro text-paper/60 mt-3">
+                                {resendMessage}
+                            </div>
+                        )}
+                        <Link
+                            href="/login"
+                            className="text-caption text-steel hover:text-paper transition-colors duration-120 block mt-6"
+                        >
+                            Back to sign in
+                        </Link>
+                    </div>
+                ) : (
                 <form onSubmit={handleSubmit} noValidate>
                     <h1 className="text-h3 font-medium text-paper mb-2 tracking-[-0.01em]">
                         Create account
@@ -148,6 +213,7 @@ export default function SignupPage() {
                         </Link>
                     </div>
                 </form>
+                )}
             </div>
         </div>
     );

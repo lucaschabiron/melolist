@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { signIn } from "../../lib/auth-client";
+import { authClient, signIn } from "../../lib/auth-client";
 
 type FieldErrors = { email?: string; password?: string; form?: string };
 
@@ -14,6 +14,14 @@ export default function LoginPage() {
     const [password, setPassword] = useState("");
     const [errors, setErrors] = useState<FieldErrors>({});
     const [loading, setLoading] = useState(false);
+    const [needsVerification, setNeedsVerification] = useState(false);
+    const [resending, setResending] = useState(false);
+    const [resendMessage, setResendMessage] = useState<string | null>(null);
+
+    const callbackURL =
+        typeof window === "undefined"
+            ? undefined
+            : new URL("/", window.location.origin).toString();
 
     const validate = (): FieldErrors => {
         const e: FieldErrors = {};
@@ -31,13 +39,41 @@ export default function LoginPage() {
             return;
         }
         setLoading(true);
-        const { error } = await signIn.email({ email, password });
+        setNeedsVerification(false);
+        setResendMessage(null);
+        const { error } = await signIn.email({ email, password, callbackURL });
         setLoading(false);
         if (error) {
+            const errorCode = (error as { code?: string } | null)?.code;
+            if (errorCode === "EMAIL_NOT_VERIFIED") {
+                setNeedsVerification(true);
+                setErrors({
+                    form: "This account is waiting for email verification.",
+                });
+                return;
+            }
+
             setErrors({ form: error.message ?? "Sign in failed." });
             return;
         }
         router.push("/");
+    };
+
+    const handleResendVerification = async () => {
+        setResending(true);
+        setResendMessage(null);
+
+        const { error } = await authClient.sendVerificationEmail({
+            email,
+            callbackURL,
+        });
+
+        setResending(false);
+        setResendMessage(
+            error
+                ? error.message ?? "Could not resend the verification email."
+                : "Verification email sent again.",
+        );
     };
 
     return (
@@ -101,6 +137,25 @@ export default function LoginPage() {
                     {errors.form && (
                         <div className="text-micro text-paper/60 mb-3">
                             {errors.form}
+                        </div>
+                    )}
+                    {needsVerification && (
+                        <div className="mb-3">
+                            <button
+                                type="button"
+                                onClick={handleResendVerification}
+                                disabled={resending}
+                                className="text-micro text-paper hover:opacity-70 transition-opacity duration-[120ms] disabled:opacity-40"
+                            >
+                                {resending
+                                    ? "Sending again…"
+                                    : "Resend verification email"}
+                            </button>
+                            {resendMessage && (
+                                <div className="text-micro text-paper/60 mt-2">
+                                    {resendMessage}
+                                </div>
+                            )}
                         </div>
                     )}
 
