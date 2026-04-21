@@ -7,8 +7,13 @@ import {
 } from "@melolist/db";
 import { coverArtUrl, getReleaseGroup } from "@melolist/musicbrainz";
 import type { Job } from "bullmq";
-import type { MusicbrainzJobData } from "@melolist/queue";
-import { joinArtistCredit, mapReleaseType, parseDate } from "../mappers";
+import { enqueueFetchReleases, type MusicbrainzJobData } from "@melolist/queue";
+import {
+    isCanonicalAlbumReleaseGroup,
+    joinArtistCredit,
+    mapReleaseType,
+    parseDate,
+} from "../mappers";
 
 async function upsertArtistStub(
     mbid: string,
@@ -57,6 +62,12 @@ export async function processFetchReleaseGroup(
             primaryCredit.artist["sort-name"] ?? null,
             primaryCredit.artist.disambiguation ?? null,
         );
+        const mappedType = mapReleaseType(rg);
+        const secondaryTypes = rg["secondary-types"] ?? [];
+        const shouldSeedReleases = isCanonicalAlbumReleaseGroup(
+            mappedType,
+            secondaryTypes,
+        );
 
         const rgValues = {
             musicbrainzId: rg.id,
@@ -66,11 +77,13 @@ export async function processFetchReleaseGroup(
                 primaryCredit.artist.name,
             ),
             title: rg.title,
-            releaseType: mapReleaseType(rg),
-            secondaryTypes: rg["secondary-types"] ?? [],
+            releaseType: mappedType,
+            secondaryTypes,
             firstReleaseDate: parseDate(rg["first-release-date"]),
             coverArtUrl: coverArtUrl(rg.id),
             lastFetchedAt: new Date(),
+            releasesStatus: shouldSeedReleases ? ("pending" as const) : null,
+            releasesFetchedAt: null,
         };
 
         const [row] = await db
@@ -82,8 +95,13 @@ export async function processFetchReleaseGroup(
             })
             .returning({ id: releaseGroup.id });
 
+        if (shouldSeedReleases) {
+            await enqueueFetchReleases(rg.id);
+        }
+
         await db.insert(musicbrainzFetchLog).values({
             entityType: "release_group",
+            operation: "fetch_release_group",
             musicbrainzId: mbid,
             status: "success",
         });
@@ -93,6 +111,7 @@ export async function processFetchReleaseGroup(
         const message = err instanceof Error ? err.message : String(err);
         await db.insert(musicbrainzFetchLog).values({
             entityType: "release_group",
+            operation: "fetch_release_group",
             musicbrainzId: mbid,
             status: "failure",
             error: message,

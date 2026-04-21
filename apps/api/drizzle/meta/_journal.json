@@ -22,6 +22,20 @@
       "when": 1776727382627,
       "tag": "0002_add_secondary_types",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1776788138444,
+      "tag": "0003_add_releases",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776790843703,
+      "tag": "0004_cold_thor_girl",
+      "breakpoints": true
     }
   ]
 }

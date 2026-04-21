@@ -1,6 +1,7 @@
 import {
     artist,
     db,
+    eq,
     musicbrainzFetchLog,
     releaseGroup,
 } from "@melolist/db";
@@ -10,8 +11,9 @@ import {
     getArtist,
 } from "@melolist/musicbrainz";
 import type { Job } from "bullmq";
-import type { MusicbrainzJobData } from "@melolist/queue";
+import { enqueueFetchReleases, type MusicbrainzJobData } from "@melolist/queue";
 import {
+    isCanonicalAlbumReleaseGroup,
     joinArtistCredit,
     mapReleaseType,
     parseDate,
@@ -22,6 +24,7 @@ export async function processFetchArtist(
     job: Job<MusicbrainzJobData["fetch-artist"]>,
 ): Promise<{ artistId: string }> {
     const { mbid } = job.data;
+    let profileWritten = false;
 
     try {
         const mb = await getArtist(mbid);
@@ -34,7 +37,10 @@ export async function processFetchArtist(
             country: mb.country ?? null,
             foundedYear: parseYear(mb["life-span"]?.begin),
             dissolvedYear: parseYear(mb["life-span"]?.end),
+            profileSeedStatus: "ready" as const,
+            discographySeedStatus: "seeding" as const,
             lastFetchedAt: new Date(),
+            discographyFetchedAt: null,
         };
 
         const [row] = await db
@@ -47,10 +53,19 @@ export async function processFetchArtist(
             .returning({ id: artist.id });
 
         const artistId = row!.id;
+        profileWritten = true;
 
         const rgs = await browseReleaseGroupsByArtist(mbid);
+        const releaseGroupMbidsToSeed: string[] = [];
 
         for (const rg of rgs) {
+            const mappedType = mapReleaseType(rg);
+            const secondaryTypes = rg["secondary-types"] ?? [];
+            const shouldSeedReleases = isCanonicalAlbumReleaseGroup(
+                mappedType,
+                secondaryTypes,
+            );
+
             const rgValues = {
                 musicbrainzId: rg.id,
                 artistId,
@@ -59,24 +74,44 @@ export async function processFetchArtist(
                     mb.name,
                 ),
                 title: rg.title,
-                releaseType: mapReleaseType(rg),
-                secondaryTypes: rg["secondary-types"] ?? [],
+                releaseType: mappedType,
+                secondaryTypes,
                 firstReleaseDate: parseDate(rg["first-release-date"]),
                 coverArtUrl: coverArtUrl(rg.id),
                 lastFetchedAt: new Date(),
+                releasesStatus: shouldSeedReleases
+                    ? ("pending" as const)
+                    : null,
+                releasesFetchedAt: null,
             };
 
-            await db
-                .insert(releaseGroup)
-                .values(rgValues)
-                .onConflictDoUpdate({
-                    target: releaseGroup.musicbrainzId,
-                    set: rgValues,
-                });
+            await db.insert(releaseGroup).values(rgValues).onConflictDoUpdate({
+                target: releaseGroup.musicbrainzId,
+                set: rgValues,
+            });
+
+            if (shouldSeedReleases) {
+                releaseGroupMbidsToSeed.push(rg.id);
+            }
         }
+
+        await Promise.all(
+            releaseGroupMbidsToSeed.map((releaseGroupMbid) =>
+                enqueueFetchReleases(releaseGroupMbid),
+            ),
+        );
+
+        await db
+            .update(artist)
+            .set({
+                discographySeedStatus: "ready",
+                discographyFetchedAt: new Date(),
+            })
+            .where(eq(artist.id, artistId));
 
         await db.insert(musicbrainzFetchLog).values({
             entityType: "artist",
+            operation: "fetch_artist",
             musicbrainzId: mbid,
             status: "success",
         });
@@ -84,8 +119,22 @@ export async function processFetchArtist(
         return { artistId };
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+
+        await db
+            .update(artist)
+            .set(
+                profileWritten
+                    ? { discographySeedStatus: "failed" }
+                    : {
+                          profileSeedStatus: "failed",
+                          discographySeedStatus: "failed",
+                      },
+            )
+            .where(eq(artist.musicbrainzId, mbid));
+
         await db.insert(musicbrainzFetchLog).values({
             entityType: "artist",
+            operation: "fetch_artist",
             musicbrainzId: mbid,
             status: "failure",
             error: message,

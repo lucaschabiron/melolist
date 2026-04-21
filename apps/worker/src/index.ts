@@ -7,6 +7,12 @@ import {
 } from "@melolist/queue";
 import { processFetchArtist } from "./processors/fetch-artist";
 import { processFetchReleaseGroup } from "./processors/fetch-release-group";
+import { processFetchReleases } from "./processors/fetch-releases";
+
+const WORKER_CONCURRENCY = Math.max(
+    Number.parseInt(process.env.WORKER_CONCURRENCY ?? "4", 10) || 1,
+    1,
+);
 
 const worker = new Worker<
     MusicbrainzJobData[MusicbrainzJobName],
@@ -24,18 +30,24 @@ const worker = new Worker<
                 return processFetchReleaseGroup(
                     job as Parameters<typeof processFetchReleaseGroup>[0],
                 );
+            case "fetch-releases":
+                return processFetchReleases(
+                    job as Parameters<typeof processFetchReleases>[0],
+                );
             default:
                 throw new Error(`unknown job: ${job.name}`);
         }
     },
     {
         connection: getQueueRedis(),
-        concurrency: 1,
+        concurrency: WORKER_CONCURRENCY,
     },
 );
 
 worker.on("ready", () => {
-    console.log(`[worker] ready, queue=${MUSICBRAINZ_QUEUE}`);
+    console.log(
+        `[worker] ready, queue=${MUSICBRAINZ_QUEUE}, concurrency=${WORKER_CONCURRENCY}`,
+    );
 });
 
 worker.on("completed", (job) => {

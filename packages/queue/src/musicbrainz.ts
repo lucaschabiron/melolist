@@ -5,16 +5,19 @@ export const MUSICBRAINZ_QUEUE = "musicbrainz";
 
 export type MusicbrainzJobName =
     | "fetch-artist"
-    | "fetch-release-group";
+    | "fetch-release-group"
+    | "fetch-releases";
 
 export type MusicbrainzJobData = {
     "fetch-artist": { mbid: string };
     "fetch-release-group": { mbid: string };
+    "fetch-releases": { releaseGroupMbid: string };
 };
 
 export type MusicbrainzJobReturn = {
     "fetch-artist": { artistId: string };
     "fetch-release-group": { releaseGroupId: string };
+    "fetch-releases": { count: number };
 };
 
 let queue: Queue | null = null;
@@ -50,6 +53,16 @@ export async function enqueueFetchReleaseGroup(mbid: string) {
         "fetch-release-group" satisfies MusicbrainzJobName,
         { mbid } satisfies MusicbrainzJobData["fetch-release-group"],
         { jobId: jobId("fetch-release-group", mbid) },
+    );
+}
+
+export async function enqueueFetchReleases(releaseGroupMbid: string) {
+    return getMusicbrainzQueue().add(
+        "fetch-releases" satisfies MusicbrainzJobName,
+        {
+            releaseGroupMbid,
+        } satisfies MusicbrainzJobData["fetch-releases"],
+        { jobId: jobId("fetch-releases", releaseGroupMbid) },
     );
 }
 

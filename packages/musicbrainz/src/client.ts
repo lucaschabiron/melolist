@@ -4,6 +4,8 @@ import type {
     MbArtist,
     MbArtistSearchResult,
     MbBrowseReleaseGroups,
+    MbBrowseReleases,
+    MbRelease,
     MbReleaseGroup,
 } from "./types";
 
@@ -81,6 +83,26 @@ export function searchArtists(
 ): Promise<MbArtistSearchResult> {
     const q = encodeURIComponent(query);
     return mbFetch<MbArtistSearchResult>(`/artist?query=${q}&limit=${limit}`);
+}
+
+export async function browseReleasesByReleaseGroup(
+    releaseGroupMbid: string,
+): Promise<MbRelease[]> {
+    const all: MbRelease[] = [];
+    const limit = 100;
+    let offset = 0;
+
+    while (true) {
+        const page = await mbFetch<MbBrowseReleases>(
+            `/release?release-group=${releaseGroupMbid}&limit=${limit}&offset=${offset}`,
+        );
+        all.push(...page.releases);
+        offset += page.releases.length;
+        if (offset >= page["release-count"]) break;
+        if (page.releases.length === 0) break;
+    }
+
+    return all;
 }
 
 export function coverArtUrl(releaseGroupMbid: string): string {

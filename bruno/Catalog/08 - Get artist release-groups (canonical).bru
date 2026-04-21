@@ -1,0 +1,14 @@
+meta {
+  name: 08 - Get artist release-groups (canonical)
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/catalog/artists/{{beatlesArtistMbid}}/release-groups?canonical=true
+}
+
+headers {
+  Cookie: better-auth.session_token={{sessionCookie}}
+}
+

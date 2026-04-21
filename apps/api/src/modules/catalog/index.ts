@@ -1,15 +1,17 @@
 import { Elysia, t } from "elysia";
-import { db, artist, releaseGroup, eq, and, sql } from "@melolist/db";
+import { db, artist, releaseGroup, release, eq, and, sql } from "@melolist/db";
 import {
     enqueueFetchArtist,
     enqueueFetchReleaseGroup,
+    enqueueFetchReleases,
     getJobStatus,
 } from "@melolist/queue";
 import { getRedis, searchArtists } from "@melolist/musicbrainz";
 import { authPlugin } from "../../lib/auth-plugin";
 
 const SEARCH_CACHE_TTL_SECONDS = 3600;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function pollUrl(jobId: string): string {
     return `/catalog/jobs/${jobId}`;
@@ -24,7 +26,8 @@ export const catalogController = new Elysia({
     .get(
         "/artists/:mbid",
         async ({ params: { mbid }, status }) => {
-            if (!UUID_RE.test(mbid)) return status(400, { error: "invalid mbid" });
+            if (!UUID_RE.test(mbid))
+                return status(400, { error: "invalid mbid" });
 
             const [row] = await db
                 .select()
@@ -32,7 +35,9 @@ export const catalogController = new Elysia({
                 .where(eq(artist.musicbrainzId, mbid))
                 .limit(1);
 
-            if (row && row.lastFetchedAt) return { artist: row };
+            if (row && row.profileSeedStatus === "ready") {
+                return { artist: row };
+            }
 
             const job = await enqueueFetchArtist(mbid);
             return status(202, {
@@ -49,7 +54,8 @@ export const catalogController = new Elysia({
     .get(
         "/artists/:mbid/release-groups",
         async ({ params: { mbid }, query, status }) => {
-            if (!UUID_RE.test(mbid)) return status(400, { error: "invalid mbid" });
+            if (!UUID_RE.test(mbid))
+                return status(400, { error: "invalid mbid" });
 
             const [artistRow] = await db
                 .select()
@@ -57,7 +63,7 @@ export const catalogController = new Elysia({
                 .where(eq(artist.musicbrainzId, mbid))
                 .limit(1);
 
-            if (!artistRow || !artistRow.lastFetchedAt) {
+            if (!artistRow || artistRow.discographySeedStatus !== "ready") {
                 const job = await enqueueFetchArtist(mbid);
                 return status(202, {
                     jobId: job.id!,
@@ -71,11 +77,44 @@ export const catalogController = new Elysia({
                 filters.push(
                     sql`(${releaseGroup.secondaryTypes} IS NULL OR cardinality(${releaseGroup.secondaryTypes}) = 0)`,
                 );
+
+                const candidateReleaseGroups = await db
+                    .select({
+                        musicbrainzId: releaseGroup.musicbrainzId,
+                        releasesStatus: releaseGroup.releasesStatus,
+                    })
+                    .from(releaseGroup)
+                    .where(and(...filters));
+
+                const pendingReleaseGroups = candidateReleaseGroups.filter(
+                    (rg) => rg.releasesStatus !== "ready",
+                );
+
+                await Promise.all(
+                    pendingReleaseGroups
+                        .filter(
+                            (rg) =>
+                                rg.releasesStatus !== "seeding" &&
+                                rg.musicbrainzId !== null,
+                        )
+                        .map((rg) => enqueueFetchReleases(rg.musicbrainzId!)),
+                );
+
+                if (pendingReleaseGroups.length > 0) {
+                    return status(202, {
+                        pendingReleaseGroupCount: pendingReleaseGroups.length,
+                        pollUrl: `/catalog/artists/${mbid}/release-groups?canonical=true`,
+                    });
+                }
+
+                filters.push(
+                    sql`EXISTS (SELECT 1 FROM ${release} r WHERE r.release_group_id = ${releaseGroup.id} AND r.status = 'official')`,
+                );
             } else if (query.type) {
                 filters.push(
                     eq(
                         releaseGroup.releaseType,
-                        query.type as typeof releaseGroup.releaseType.enumValues[number],
+                        query.type as (typeof releaseGroup.releaseType.enumValues)[number],
                     ),
                 );
             }
@@ -100,7 +139,8 @@ export const catalogController = new Elysia({
     .get(
         "/release-groups/:mbid",
         async ({ params: { mbid }, status }) => {
-            if (!UUID_RE.test(mbid)) return status(400, { error: "invalid mbid" });
+            if (!UUID_RE.test(mbid))
+                return status(400, { error: "invalid mbid" });
 
             const [rg] = await db
                 .select()

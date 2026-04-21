@@ -49,3 +49,18 @@ export type MbArtistSearchResult = {
         }
     >;
 };
+
+export type MbRelease = {
+    id: string;
+    title: string;
+    status?: string | null;
+    date?: string | null;
+    country?: string | null;
+    disambiguation?: string | null;
+};
+
+export type MbBrowseReleases = {
+    "release-count": number;
+    "release-offset": number;
+    releases: MbRelease[];
+};

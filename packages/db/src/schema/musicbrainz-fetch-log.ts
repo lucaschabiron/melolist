@@ -10,6 +10,13 @@ import {
 export const mbEntityTypeEnum = pgEnum("mb_entity_type", [
     "artist",
     "release_group",
+    "release",
+]);
+
+export const mbFetchOperationEnum = pgEnum("mb_fetch_operation", [
+    "fetch_artist",
+    "fetch_release_group",
+    "fetch_releases",
 ]);
 
 export const mbFetchStatusEnum = pgEnum("mb_fetch_status", [
@@ -22,6 +29,7 @@ export const musicbrainzFetchLog = pgTable(
     {
         id: uuid("id").primaryKey().defaultRandom(),
         entityType: mbEntityTypeEnum("entity_type").notNull(),
+        operation: mbFetchOperationEnum("operation").notNull(),
         musicbrainzId: uuid("musicbrainz_id").notNull(),
         status: mbFetchStatusEnum("status").notNull(),
         error: text("error"),

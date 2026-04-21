@@ -8,7 +8,7 @@ import {
     timestamp,
     uuid,
 } from "drizzle-orm/pg-core";
-import { artist } from "./artists";
+import { artist, seedStatusEnum } from "./artists";
 
 export const releaseTypeEnum = pgEnum("release_type", [
     "album",
@@ -36,6 +36,10 @@ export const releaseGroup = pgTable(
         firstReleaseDate: date("first_release_date"),
         coverArtUrl: text("cover_art_url"),
         lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true }),
+        releasesStatus: seedStatusEnum("releases_status"),
+        releasesFetchedAt: timestamp("releases_fetched_at", {
+            withTimezone: true,
+        }),
         createdAt: timestamp("created_at", { withTimezone: true })
             .defaultNow()
             .notNull(),

@@ -30,6 +30,13 @@ export function mapReleaseType(rg: MbReleaseGroup): ReleaseTypeValue {
     }
 }
 
+export function isCanonicalAlbumReleaseGroup(
+    releaseType: ReleaseTypeValue,
+    secondaryTypes: string[],
+): boolean {
+    return releaseType === "album" && secondaryTypes.length === 0;
+}
+
 export function parseYear(partial?: string | null): number | null {
     if (!partial) return null;
     const match = partial.match(/^(\d{4})/);
@@ -55,4 +62,22 @@ export function joinArtistCredit(
         .map((c) => `${c.name}${c.joinphrase ?? ""}`)
         .join("")
         .trim();
+}
+
+export type ReleaseStatusValue =
+    | "official"
+    | "promotion"
+    | "bootleg"
+    | "pseudo-release";
+
+export function mapReleaseStatus(
+    status?: string | null,
+): ReleaseStatusValue | null {
+    if (!status) return null;
+    const normalized = status.toLowerCase();
+    if (normalized === "official") return "official";
+    if (normalized === "promotion") return "promotion";
+    if (normalized === "bootleg") return "bootleg";
+    if (normalized === "pseudo-release") return "pseudo-release";
+    return null;
 }
