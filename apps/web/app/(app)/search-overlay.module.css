@@ -1,0 +1,16 @@
+.shell:focus-within {
+    border-color: rgba(247, 247, 247, 0.22);
+}
+
+.input:focus,
+.input:focus-visible {
+    outline: none;
+}
+
+.input::-webkit-search-decoration,
+.input::-webkit-search-cancel-button,
+.input::-webkit-search-results-button,
+.input::-webkit-search-results-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+}

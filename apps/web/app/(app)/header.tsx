@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "../lib/auth-client";
+import { SearchOverlay } from "./search-overlay";
 
 const NAV_LINKS = [
     { label: "Home", href: "/" },
@@ -53,11 +54,7 @@ export function Header() {
                     );
                 })}
             </nav>
-            <input
-                type="search"
-                placeholder="Search"
-                className="w-45 h-7 bg-surface rounded-sm text-paper text-caption px-3 outline-none border-[0.5px] border-(--hairline) focus:border-paper/35 transition-colors duration-120 placeholder:text-steel/60"
-            />
+            <SearchOverlay />
             <button
                 onClick={handleSignOut}
                 className="text-caption text-steel hover:text-paper transition-colors duration-120"
