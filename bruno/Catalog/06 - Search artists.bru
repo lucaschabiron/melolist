@@ -1,0 +1,23 @@
+meta {
+  name: 06 - Search artists
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/catalog/search?q=radiohead&type=artist&limit=10
+  query {
+    q: radiohead
+    type: artist
+    limit: 10
+  }
+}
+
+headers {
+  Cookie: better-auth.session_token={{sessionCookie}}
+}
+
+docs {
+  Live MusicBrainz search. First hit: `cached: false`. Second hit within an
+  hour: `cached: true` (Redis-backed 1h cache keyed by query).
+}

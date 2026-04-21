@@ -1,0 +1,25 @@
+meta {
+  name: Sign in
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/auth/sign-in/email
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "test@example.com",
+    "password": "testtest123"
+  }
+}
+
+docs {
+  Response sets the `better-auth.session_token` cookie. Bruno will carry it
+  forward automatically within the same collection run if "Cookies" are enabled
+  in the app settings — otherwise copy the cookie value into the
+  `sessionCookie` secret in the local environment.
+}

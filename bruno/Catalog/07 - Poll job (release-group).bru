@@ -1,0 +1,17 @@
+meta {
+  name: 07 - Poll job (release-group)
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/catalog/jobs/fetch-release-group_{{abbeyRoadReleaseGroupMbid}}
+}
+
+headers {
+  Cookie: better-auth.session_token={{sessionCookie}}
+}
+
+docs {
+  Companion to request 05. After it completes, re-running 05 returns 200.
+}

@@ -1,0 +1,11 @@
+{
+    "name": "@melolist/musicbrainz",
+    "version": "0.0.0",
+    "private": true,
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "dependencies": {
+        "ioredis": "^5.4.1"
+    }
+}

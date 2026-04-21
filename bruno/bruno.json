@@ -1,0 +1,6 @@
+{
+    "version": "1",
+    "name": "MeloList",
+    "type": "collection",
+    "ignore": ["node_modules", ".git"]
+}

@@ -1,0 +1,193 @@
+import { Elysia, t } from "elysia";
+import { db, artist, releaseGroup, eq, and, sql } from "@melolist/db";
+import {
+    enqueueFetchArtist,
+    enqueueFetchReleaseGroup,
+    getJobStatus,
+} from "@melolist/queue";
+import { getRedis, searchArtists } from "@melolist/musicbrainz";
+import { authPlugin } from "../../lib/auth-plugin";
+
+const SEARCH_CACHE_TTL_SECONDS = 3600;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function pollUrl(jobId: string): string {
+    return `/catalog/jobs/${jobId}`;
+}
+
+export const catalogController = new Elysia({
+    name: "catalog",
+    prefix: "/catalog",
+})
+    .use(authPlugin)
+
+    .get(
+        "/artists/:mbid",
+        async ({ params: { mbid }, status }) => {
+            if (!UUID_RE.test(mbid)) return status(400, { error: "invalid mbid" });
+
+            const [row] = await db
+                .select()
+                .from(artist)
+                .where(eq(artist.musicbrainzId, mbid))
+                .limit(1);
+
+            if (row && row.lastFetchedAt) return { artist: row };
+
+            const job = await enqueueFetchArtist(mbid);
+            return status(202, {
+                jobId: job.id!,
+                pollUrl: pollUrl(job.id!),
+            });
+        },
+        {
+            auth: true,
+            params: t.Object({ mbid: t.String() }),
+        },
+    )
+
+    .get(
+        "/artists/:mbid/release-groups",
+        async ({ params: { mbid }, query, status }) => {
+            if (!UUID_RE.test(mbid)) return status(400, { error: "invalid mbid" });
+
+            const [artistRow] = await db
+                .select()
+                .from(artist)
+                .where(eq(artist.musicbrainzId, mbid))
+                .limit(1);
+
+            if (!artistRow || !artistRow.lastFetchedAt) {
+                const job = await enqueueFetchArtist(mbid);
+                return status(202, {
+                    jobId: job.id!,
+                    pollUrl: pollUrl(job.id!),
+                });
+            }
+
+            const filters = [eq(releaseGroup.artistId, artistRow.id)];
+            if (query.canonical === "true") {
+                filters.push(eq(releaseGroup.releaseType, "album"));
+                filters.push(
+                    sql`(${releaseGroup.secondaryTypes} IS NULL OR cardinality(${releaseGroup.secondaryTypes}) = 0)`,
+                );
+            } else if (query.type) {
+                filters.push(
+                    eq(
+                        releaseGroup.releaseType,
+                        query.type as typeof releaseGroup.releaseType.enumValues[number],
+                    ),
+                );
+            }
+
+            const rgs = await db
+                .select()
+                .from(releaseGroup)
+                .where(and(...filters));
+
+            return { artist: artistRow, releaseGroups: rgs };
+        },
+        {
+            auth: true,
+            params: t.Object({ mbid: t.String() }),
+            query: t.Object({
+                canonical: t.Optional(t.String()),
+                type: t.Optional(t.String()),
+            }),
+        },
+    )
+
+    .get(
+        "/release-groups/:mbid",
+        async ({ params: { mbid }, status }) => {
+            if (!UUID_RE.test(mbid)) return status(400, { error: "invalid mbid" });
+
+            const [rg] = await db
+                .select()
+                .from(releaseGroup)
+                .where(eq(releaseGroup.musicbrainzId, mbid))
+                .limit(1);
+
+            if (rg && rg.lastFetchedAt) {
+                const [artistRow] = await db
+                    .select()
+                    .from(artist)
+                    .where(eq(artist.id, rg.artistId))
+                    .limit(1);
+                return { releaseGroup: rg, artist: artistRow ?? null };
+            }
+
+            const job = await enqueueFetchReleaseGroup(mbid);
+            return status(202, {
+                jobId: job.id!,
+                pollUrl: pollUrl(job.id!),
+            });
+        },
+        {
+            auth: true,
+            params: t.Object({ mbid: t.String() }),
+        },
+    )
+
+    .get(
+        "/search",
+        async ({ query, status }) => {
+            const q = query.q.trim();
+            if (q.length < 2) return status(400, { error: "query too short" });
+
+            const type = query.type ?? "artist";
+            if (type !== "artist") {
+                return status(400, { error: "only type=artist supported" });
+            }
+            const limit = Math.min(Math.max(query.limit ?? 25, 1), 100);
+
+            const redis = getRedis();
+            const cacheKey = `mb:search:artist:${limit}:${q.toLowerCase()}`;
+
+            const cached = await redis.get(cacheKey);
+            if (cached) {
+                return { cached: true, ...JSON.parse(cached) };
+            }
+
+            const mbResult = await searchArtists(q, limit);
+            const artists = mbResult.artists.map((a) => ({
+                musicbrainzId: a.id,
+                name: a.name,
+                sortName: a["sort-name"],
+                disambiguation: a.disambiguation,
+                country: a.country,
+                score: a.score,
+            }));
+
+            const payload = { count: mbResult.count, artists };
+            await redis.set(
+                cacheKey,
+                JSON.stringify(payload),
+                "EX",
+                SEARCH_CACHE_TTL_SECONDS,
+            );
+
+            return { cached: false, ...payload };
+        },
+        {
+            auth: true,
+            query: t.Object({
+                q: t.String({ minLength: 2 }),
+                type: t.Optional(t.String()),
+                limit: t.Optional(t.Number()),
+            }),
+        },
+    )
+
+    .get(
+        "/jobs/:id",
+        async ({ params: { id }, status }) => {
+            const job = await getJobStatus(id);
+            if (!job) return status(404, { error: "job not found" });
+            return job;
+        },
+        {
+            auth: true,
+            params: t.Object({ id: t.String() }),
+        },
+    );

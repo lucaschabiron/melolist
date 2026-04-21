@@ -8,6 +8,20 @@
       "when": 1776617554257,
       "tag": "0000_cynical_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776724778094,
+      "tag": "0001_flowery_mariko_yashida",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776727382627,
+      "tag": "0002_add_secondary_types",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,20 @@
+meta {
+  name: 05 - Get release-group
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/catalog/release-groups/{{abbeyRoadReleaseGroupMbid}}
+}
+
+headers {
+  Cookie: better-auth.session_token={{sessionCookie}}
+}
+
+docs {
+  Ingests a single release-group without pulling sibling RGs (separate job
+  from fetch-artist). The RG's parent artist is upserted as a stub — so after
+  running, `GET /catalog/artists/{beatles-mbid}` is still 202 (not
+  fully seeded) until you hit fetch-artist explicitly.
+}

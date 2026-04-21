@@ -1,0 +1,19 @@
+meta {
+  name: 02 - Poll job
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/catalog/jobs/fetch-artist_{{beatlesArtistMbid}}
+}
+
+headers {
+  Cookie: better-auth.session_token={{sessionCookie}}
+}
+
+docs {
+  Poll until `status: "completed"`. Worker processes fetch-artist jobs one at
+  a time (MB rate limit is 1 req/sec, and browsing a large discography
+  paginates — Beatles takes a few seconds).
+}

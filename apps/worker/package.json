@@ -1,0 +1,19 @@
+{
+    "name": "@melolist/worker",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "bun run --watch src/index.ts",
+        "start": "bun run src/index.ts"
+    },
+    "dependencies": {
+        "@melolist/db": "workspace:*",
+        "@melolist/musicbrainz": "workspace:*",
+        "@melolist/queue": "workspace:*",
+        "bullmq": "^5.55.0",
+        "ioredis": "^5.4.1"
+    },
+    "devDependencies": {
+        "bun-types": "latest"
+    }
+}

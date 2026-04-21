@@ -1,0 +1,19 @@
+meta {
+  name: 01 - Get artist (cold)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/catalog/artists/{{beatlesArtistMbid}}
+}
+
+headers {
+  Cookie: better-auth.session_token={{sessionCookie}}
+}
+
+docs {
+  First call on an unseeded MBID → expect 202 with { jobId, pollUrl }.
+  Hit this 5 times in a row — all responses return the same jobId (dedup via
+  BullMQ deterministic job IDs).
+}

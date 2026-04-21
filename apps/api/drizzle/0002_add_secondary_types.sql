@@ -1,0 +1,1 @@
+ALTER TABLE "release_group" ADD COLUMN "secondary_types" text[];

@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { cors } from "@elysiajs/cors";
 import { authController } from "./modules/auth";
+import { catalogController } from "./modules/catalog";
 
 const app = new Elysia()
     .use(
@@ -12,6 +13,7 @@ const app = new Elysia()
         }),
     )
     .use(authController)
+    .use(catalogController)
     .listen(process.env.PORT ?? 3000);
 
 export type App = typeof app;

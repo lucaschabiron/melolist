@@ -1,0 +1,12 @@
+{
+    "name": "@melolist/queue",
+    "version": "0.0.0",
+    "private": true,
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "dependencies": {
+        "bullmq": "^5.55.0",
+        "ioredis": "^5.4.1"
+    }
+}

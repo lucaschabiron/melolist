@@ -1,0 +1,27 @@
+meta {
+  name: Sign up
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/auth/sign-up/email
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "test@example.com",
+    "password": "testtest123",
+    "name": "Test User",
+    "username": "test"
+  }
+}
+
+docs {
+  One-shot account creation. If email verification is enabled in auth.ts you'll
+  need to verify before sign-in works — easiest for testing is to temporarily
+  flip `requireEmailVerification: false` or set `email_verified=true` on the
+  user row in postgres.
+}
