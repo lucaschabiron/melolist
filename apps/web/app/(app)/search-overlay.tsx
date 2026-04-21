@@ -5,10 +5,8 @@ import { usePathname } from "next/navigation";
 import {
     type KeyboardEvent,
     startTransition,
-    useDeferredValue,
     useEffect,
     useId,
-    useMemo,
     useRef,
     useState,
 } from "react";
@@ -131,13 +129,24 @@ export function SearchOverlay() {
     const inputRef = useRef<HTMLInputElement>(null);
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState("");
+    const [debouncedQuery, setDebouncedQuery] = useState("");
     const [results, setResults] = useState<SearchResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const deferredQuery = useDeferredValue(query);
 
-    const trimmedQuery = deferredQuery.trim();
-    const hasQuery = trimmedQuery.length >= 2;
+    const trimmedInputQuery = query.trim();
+    const trimmedDebouncedQuery = debouncedQuery.trim();
+    const hasQuery = trimmedInputQuery.length >= 2;
+    const isWaitingForDebounce =
+        hasQuery && trimmedInputQuery !== trimmedDebouncedQuery;
+    const resultsMatchCurrentQuery =
+        results?.query.trim() === trimmedInputQuery;
+    const visibleResults =
+        !isWaitingForDebounce && resultsMatchCurrentQuery ? results : null;
+    const sectionCounts = {
+        artists: visibleResults?.artists.length ?? 0,
+        releaseGroups: visibleResults?.releaseGroups.length ?? 0,
+    };
 
     useEffect(() => {
         setIsOpen(false);
@@ -203,14 +212,24 @@ export function SearchOverlay() {
 
     useEffect(() => {
         if (!isOpen) return;
-        if (trimmedQuery.length === 0) {
+
+        const timeoutId = window.setTimeout(() => {
+            setDebouncedQuery(query);
+        }, 500);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [isOpen, query]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        if (trimmedDebouncedQuery.length === 0) {
             setResults(null);
             setError(null);
             setIsLoading(false);
             return;
         }
 
-        if (!hasQuery) {
+        if (trimmedDebouncedQuery.length < 2) {
             setResults(null);
             setError("Type at least 2 characters.");
             setIsLoading(false);
@@ -218,15 +237,20 @@ export function SearchOverlay() {
         }
 
         const controller = new AbortController();
-        const timeoutId = window.setTimeout(async () => {
+        startTransition(() => {
+            setIsLoading(true);
+            setError(null);
+            setResults(null);
+        });
+
+        void (async () => {
             startTransition(() => {
-                setIsLoading(true);
                 setError(null);
             });
 
             try {
                 const response = await fetch(
-                    `${apiBaseUrl}catalog/search?q=${encodeURIComponent(trimmedQuery)}`,
+                    `${apiBaseUrl}catalog/search?q=${encodeURIComponent(trimmedDebouncedQuery)}`,
                     {
                         credentials: "include",
                         signal: controller.signal,
@@ -265,21 +289,12 @@ export function SearchOverlay() {
                     });
                 }
             }
-        }, 180);
+        })();
 
         return () => {
             controller.abort();
-            window.clearTimeout(timeoutId);
         };
-    }, [hasQuery, isOpen, trimmedQuery]);
-
-    const sectionCounts = useMemo(
-        () => ({
-            artists: results?.artists.length ?? 0,
-            releaseGroups: results?.releaseGroups.length ?? 0,
-        }),
-        [results],
-    );
+    }, [isOpen, trimmedDebouncedQuery]);
 
     const handleOverlayKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
         if (event.key === "Escape") {
@@ -367,15 +382,17 @@ export function SearchOverlay() {
                                     </EmptySection>
                                 ) : error ? (
                                     <EmptySection>{error}</EmptySection>
-                                ) : isLoading && !results ? (
+                                ) : isWaitingForDebounce ||
+                                  (isLoading && !visibleResults) ? (
                                     <EmptySection>Searching…</EmptySection>
-                                ) : results && results.artists.length === 0 ? (
+                                ) : visibleResults &&
+                                  visibleResults.artists.length === 0 ? (
                                     <EmptySection>
                                         No artists found.
                                     </EmptySection>
                                 ) : (
                                     <div className="space-y-2">
-                                        {results?.artists.map((artist) => (
+                                        {visibleResults?.artists.map((artist) => (
                                             <Link
                                                 key={artist.mbid}
                                                 href={`/artists/${artist.mbid}`}
@@ -433,16 +450,17 @@ export function SearchOverlay() {
                                     </EmptySection>
                                 ) : error ? (
                                     <EmptySection>{error}</EmptySection>
-                                ) : isLoading && !results ? (
+                                ) : isWaitingForDebounce ||
+                                  (isLoading && !visibleResults) ? (
                                     <EmptySection>Searching…</EmptySection>
-                                ) : results &&
-                                  results.releaseGroups.length === 0 ? (
+                                ) : visibleResults &&
+                                  visibleResults.releaseGroups.length === 0 ? (
                                     <EmptySection>
                                         No release groups found.
                                     </EmptySection>
                                 ) : (
                                     <div className="space-y-2">
-                                        {results?.releaseGroups.map(
+                                        {visibleResults?.releaseGroups.map(
                                             (releaseGroup) => (
                                                 <Link
                                                     key={releaseGroup.mbid}
