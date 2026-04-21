@@ -57,3 +57,14 @@ body {
     outline-offset: 2px;
     border-radius: var(--radius-sm);
 }
+
+.h-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+.h-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.h-scroll::-webkit-scrollbar-thumb {
+    background: rgba(107, 107, 107, 0.3);
+    border-radius: 3px;
+}
