@@ -46,8 +46,8 @@ function searchMatchFilter(
 async function searchLocalArtists(
     normalizedQuery: string,
 ): Promise<CatalogSearchArtistResult[]> {
-    const artistName = sql<string>`unaccent(lower(${artist.name}))`;
-    const artistSortName = sql<string>`unaccent(lower(coalesce(${artist.sortName}, '')))`;
+    const artistName = sql<string>`immutable_unaccent(lower(${artist.name}))`;
+    const artistSortName = sql<string>`immutable_unaccent(lower(coalesce(${artist.sortName}, '')))`;
 
     const searchScore = sql<number>`
         GREATEST(
@@ -101,9 +101,9 @@ async function searchLocalArtists(
 async function searchLocalReleaseGroups(
     normalizedQuery: string,
 ): Promise<CatalogSearchReleaseGroupResult[]> {
-    const releaseGroupTitle = sql<string>`unaccent(lower(${releaseGroup.title}))`;
-    const releaseGroupArtistCredit = sql<string>`unaccent(lower(${releaseGroup.primaryArtistCredit}))`;
-    const artistName = sql<string>`unaccent(lower(${artist.name}))`;
+    const releaseGroupTitle = sql<string>`immutable_unaccent(lower(${releaseGroup.title}))`;
+    const releaseGroupArtistCredit = sql<string>`immutable_unaccent(lower(${releaseGroup.primaryArtistCredit}))`;
+    const artistName = sql<string>`immutable_unaccent(lower(${artist.name}))`;
 
     const searchScore = sql<number>`
         GREATEST(
