@@ -7,6 +7,7 @@ import type {
     MbBrowseReleases,
     MbRelease,
     MbReleaseGroup,
+    MbReleaseGroupSearchResult,
 } from "./types";
 
 const BASE_URL = "https://musicbrainz.org/ws/2";
@@ -52,9 +53,7 @@ export function getArtist(mbid: string): Promise<MbArtist> {
 }
 
 export function getReleaseGroup(mbid: string): Promise<MbReleaseGroup> {
-    return mbFetch<MbReleaseGroup>(
-        `/release-group/${mbid}?inc=artist-credits`,
-    );
+    return mbFetch<MbReleaseGroup>(`/release-group/${mbid}?inc=artist-credits`);
 }
 
 export async function browseReleaseGroupsByArtist(
@@ -83,6 +82,16 @@ export function searchArtists(
 ): Promise<MbArtistSearchResult> {
     const q = encodeURIComponent(query);
     return mbFetch<MbArtistSearchResult>(`/artist?query=${q}&limit=${limit}`);
+}
+
+export function searchReleaseGroups(
+    query: string,
+    limit = 25,
+): Promise<MbReleaseGroupSearchResult> {
+    const q = encodeURIComponent(query);
+    return mbFetch<MbReleaseGroupSearchResult>(
+        `/release-group?query=${q}&limit=${limit}&inc=artist-credits`,
+    );
 }
 
 export async function browseReleasesByReleaseGroup(

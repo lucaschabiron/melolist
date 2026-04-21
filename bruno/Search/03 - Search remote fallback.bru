@@ -1,0 +1,19 @@
+meta {
+  name: 03 - Search remote fallback
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/catalog/search?q=boards of canada
+}
+
+headers {
+  Cookie: better-auth.session_token={{sessionCookie}}
+}
+
+docs {
+  Probe a query that may not be seeded locally. Expect grouped results and at
+  least one section with `usedRemoteFallback: true` when local coverage is below
+  the fallback threshold.
+}

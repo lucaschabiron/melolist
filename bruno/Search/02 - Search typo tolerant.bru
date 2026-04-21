@@ -1,0 +1,18 @@
+meta {
+  name: 02 - Search typo tolerant
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/catalog/search?q=radihead
+}
+
+headers {
+  Cookie: better-auth.session_token={{sessionCookie}}
+}
+
+docs {
+  Typo-tolerance probe. This should still surface `Radiohead`-like results from
+  the local trigram search or MusicBrainz fallback if local coverage is weak.
+}

@@ -36,6 +36,13 @@
       "when": 1776790843703,
       "tag": "0004_cold_thor_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776802678000,
+      "tag": "0005_add_search_indexes",
+      "breakpoints": true
     }
   ]
 }

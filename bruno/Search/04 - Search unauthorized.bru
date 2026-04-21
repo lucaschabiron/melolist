@@ -1,0 +1,13 @@
+meta {
+  name: 04 - Search unauthorized
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/catalog/search?q=radiohead
+}
+
+docs {
+  Auth guard check. With no session cookie, this endpoint should return `401`.
+}

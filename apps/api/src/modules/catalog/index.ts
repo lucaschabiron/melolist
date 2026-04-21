@@ -6,10 +6,8 @@ import {
     enqueueFetchReleases,
     getJobStatus,
 } from "@melolist/queue";
-import { getRedis, searchArtists } from "@melolist/musicbrainz";
 import { authPlugin } from "../../lib/auth-plugin";
-
-const SEARCH_CACHE_TTL_SECONDS = 3600;
+import { searchCatalog } from "./search";
 const UUID_RE =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -174,47 +172,12 @@ export const catalogController = new Elysia({
         async ({ query, status }) => {
             const q = query.q.trim();
             if (q.length < 2) return status(400, { error: "query too short" });
-
-            const type = query.type ?? "artist";
-            if (type !== "artist") {
-                return status(400, { error: "only type=artist supported" });
-            }
-            const limit = Math.min(Math.max(query.limit ?? 25, 1), 100);
-
-            const redis = getRedis();
-            const cacheKey = `mb:search:artist:${limit}:${q.toLowerCase()}`;
-
-            const cached = await redis.get(cacheKey);
-            if (cached) {
-                return { cached: true, ...JSON.parse(cached) };
-            }
-
-            const mbResult = await searchArtists(q, limit);
-            const artists = mbResult.artists.map((a) => ({
-                musicbrainzId: a.id,
-                name: a.name,
-                sortName: a["sort-name"],
-                disambiguation: a.disambiguation,
-                country: a.country,
-                score: a.score,
-            }));
-
-            const payload = { count: mbResult.count, artists };
-            await redis.set(
-                cacheKey,
-                JSON.stringify(payload),
-                "EX",
-                SEARCH_CACHE_TTL_SECONDS,
-            );
-
-            return { cached: false, ...payload };
+            return searchCatalog(q);
         },
         {
             auth: true,
             query: t.Object({
                 q: t.String({ minLength: 2 }),
-                type: t.Optional(t.String()),
-                limit: t.Optional(t.Number()),
             }),
         },
     )

@@ -5,7 +5,8 @@
         "moduleResolution": "bundler",
         "module": "esnext",
         "target": "esnext",
-        "skipLibCheck": true
+        "skipLibCheck": true,
+        "types": ["bun-types"]
     },
     "include": ["**/*.ts"],
     "exclude": ["node_modules"]

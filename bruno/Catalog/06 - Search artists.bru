@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/catalog/search?q=radiohead&type=artist&limit=10
+  url: {{baseUrl}}/catalog/search?q=radiohead
 }
 
 headers {
@@ -13,6 +13,6 @@ headers {
 }
 
 docs {
-  Live MusicBrainz search. First hit: `cached: false`. Second hit within an
-  hour: `cached: true` (Redis-backed 1h cache keyed by query).
+  Grouped authenticated search. Returns `artists`, `releaseGroups`, and
+  per-section fallback metadata.
 }

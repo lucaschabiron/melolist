@@ -1,0 +1,19 @@
+meta {
+  name: 01 - Search local-first
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/catalog/search?q=radiohead
+}
+
+headers {
+  Cookie: better-auth.session_token={{sessionCookie}}
+}
+
+docs {
+  Happy-path authenticated search for a likely seeded artist. Expect grouped
+  results with `artists` and `releaseGroups`. If local coverage is strong
+  enough, `meta.*.usedRemoteFallback` should stay `false`.
+}

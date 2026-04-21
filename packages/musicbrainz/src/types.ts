@@ -32,6 +32,7 @@ export type MbReleaseGroup = {
     "secondary-types"?: string[];
     "first-release-date"?: string | null;
     "artist-credit"?: MbArtistCredit[];
+    score?: number;
 };
 
 export type MbBrowseReleaseGroups = {
@@ -48,6 +49,12 @@ export type MbArtistSearchResult = {
             score?: number;
         }
     >;
+};
+
+export type MbReleaseGroupSearchResult = {
+    count: number;
+    offset: number;
+    "release-groups": MbReleaseGroup[];
 };
 
 export type MbRelease = {
