@@ -47,7 +47,7 @@ export function Header() {
         <header className="border-b-[0.5px] border-(--hairline)">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
                 <div className="flex items-center gap-4 md:gap-8">
-                    <Link href="/" aria-label="Home">
+                    <Link href="/" aria-label="Home" className="shrink-0">
                         <Image
                             src="/logo-lockup.svg"
                             alt="MeloList"
@@ -59,11 +59,11 @@ export function Header() {
                     <nav className="hidden md:flex md:gap-6 md:flex-1">
                         {renderLinks("desktop")}
                     </nav>
-                    <div className="flex items-center gap-3 md:gap-6 ml-auto md:ml-0">
+                    <div className="flex shrink-0 items-center gap-3 md:gap-6 ml-auto md:ml-0">
                         <SearchOverlay />
                         <button
                             onClick={handleSignOut}
-                            className="text-caption text-steel hover:text-paper transition-colors duration-120"
+                            className="shrink-0 text-caption text-steel hover:text-paper transition-colors duration-120"
                         >
                             Sign out
                         </button>

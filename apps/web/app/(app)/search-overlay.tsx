@@ -105,7 +105,7 @@ function ResultMeta({
     seeded: boolean;
 }) {
     return (
-        <span className="text-[11px] uppercase tracking-[0.16em] text-steel/70">
+        <span className="hidden shrink-0 whitespace-nowrap text-micro uppercase tracking-[0.16em] text-steel/70 sm:inline">
             {source === "local"
                 ? seeded
                     ? "Indexed"
@@ -309,7 +309,7 @@ export function SearchOverlay() {
                 type="button"
                 aria-label="Open search"
                 onClick={() => setIsOpen(true)}
-                className="flex h-9 w-9 items-center justify-center rounded-full border-[0.5px] border-(--hairline) bg-white/[0.03] text-steel transition-colors duration-120 hover:text-paper hover:border-paper/20"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-[0.5px] border-(--hairline) bg-white/3 text-steel transition-colors duration-120 hover:text-paper hover:border-paper/20"
             >
                 <SearchIcon />
             </button>
@@ -331,7 +331,7 @@ export function SearchOverlay() {
                             <div
                                 className={`${styles.shell} flex items-center gap-3 rounded-xl border-[0.5px] border-(--hairline) bg-surface/96 px-4 py-3 shadow-[0_16px_42px_rgba(0,0,0,0.3)] transition-colors duration-120`}
                             >
-                                <div className="text-steel">
+                                <div className="shrink-0 text-steel">
                                     <SearchIcon className="size-4.5" />
                                 </div>
                                 <label htmlFor={inputId} className="sr-only">
@@ -341,17 +341,18 @@ export function SearchOverlay() {
                                     id={inputId}
                                     ref={inputRef}
                                     type="search"
+                                    size={1}
                                     value={query}
                                     onChange={(event) =>
                                         setQuery(event.target.value)
                                     }
-                                    placeholder="Search artists, albums, EPs, soundtracks..."
-                                    className={`${styles.input} h-9 flex-1 bg-transparent text-[18px] font-medium tracking-[-0.015em] text-paper outline-none placeholder:text-steel/55 md:text-[22px]`}
+                                    placeholder="Search artists, albums..."
+                                    className={`${styles.input} h-9 min-w-0 flex-1 bg-transparent text-[18px] font-medium tracking-[-0.015em] text-paper outline-none placeholder:text-steel/55 md:text-[22px]`}
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setIsOpen(false)}
-                                    className="flex h-8 w-8 items-center justify-center rounded-full text-steel transition-colors duration-120 hover:bg-paper/5 hover:text-paper"
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-steel transition-colors duration-120 hover:bg-paper/5 hover:text-paper"
                                 >
                                     <CloseIcon />
                                 </button>
@@ -363,7 +364,7 @@ export function SearchOverlay() {
                             </div>
                         </div>
 
-                        <div className="mx-auto mt-5 grid w-full max-w-[1120px] gap-4 lg:grid-cols-2 lg:items-start">
+                        <div className="mx-auto mt-5 grid w-full max-w-[1120px] grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
                             <section className="rounded-xl border-[0.5px] border-(--hairline) bg-surface/94 p-4 shadow-[0_14px_36px_rgba(0,0,0,0.24)]">
                                 <div className="mb-4 flex items-center justify-between">
                                     <h2 className="text-[17px] font-medium tracking-[-0.015em] text-paper">
@@ -396,9 +397,9 @@ export function SearchOverlay() {
                                             <Link
                                                 key={artist.mbid}
                                                 href={`/artists/${artist.mbid}`}
-                                                className="flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors duration-120 hover:bg-paper/[0.04]"
+                                                className="flex min-w-0 items-start gap-3 rounded-lg px-3 py-2.5 transition-colors duration-120 hover:bg-paper/4"
                                             >
-                                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-[0.5px] border-(--hairline) bg-paper/[0.04] text-caption font-medium text-paper/80">
+                                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-[0.5px] border-(--hairline) bg-paper/4 text-caption font-medium text-paper/80">
                                                     {artist.name
                                                         .slice(0, 2)
                                                         .toUpperCase()}
@@ -407,16 +408,16 @@ export function SearchOverlay() {
                                                     <div className="truncate text-body font-medium text-paper">
                                                         {artist.name}
                                                     </div>
-                                                    <div className="mt-0.5 flex items-center gap-2 text-caption text-steel">
+                                                    <div className="mt-0.5 flex min-w-0 items-center gap-2 text-caption text-steel">
                                                         {artist.disambiguation ? (
-                                                            <span className="truncate">
+                                                            <span className="min-w-0 truncate">
                                                                 {
                                                                     artist.disambiguation
                                                                 }
                                                             </span>
                                                         ) : null}
                                                         {artist.country ? (
-                                                            <span>
+                                                            <span className="shrink-0">
                                                                 {artist.country}
                                                             </span>
                                                         ) : null}
@@ -465,9 +466,9 @@ export function SearchOverlay() {
                                                 <Link
                                                     key={releaseGroup.mbid}
                                                     href={`/release-groups/${releaseGroup.mbid}`}
-                                                    className="flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors duration-120 hover:bg-paper/[0.04]"
+                                                    className="flex min-w-0 items-start gap-3 rounded-lg px-3 py-2.5 transition-colors duration-120 hover:bg-paper/4"
                                                 >
-                                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-[0.5px] border-(--hairline) bg-paper/[0.04] px-1 text-micro uppercase tracking-[0.12em] text-paper/75">
+                                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-[0.5px] border-(--hairline) bg-paper/4 px-1 text-micro uppercase tracking-[0.12em] text-paper/75">
                                                         {prettyReleaseType(
                                                             releaseGroup.releaseType,
                                                         )}
@@ -481,14 +482,14 @@ export function SearchOverlay() {
                                                                 releaseGroup.artistCredit
                                                             }
                                                         </div>
-                                                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-micro uppercase tracking-[0.14em] text-steel/70">
-                                                            <span>
+                                                        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-micro uppercase tracking-[0.14em] text-steel/70">
+                                                            <span className="shrink-0">
                                                                 {prettyReleaseType(
                                                                     releaseGroup.releaseType,
                                                                 )}
                                                             </span>
                                                             {releaseGroup.firstReleaseDate ? (
-                                                                <span>
+                                                                <span className="shrink-0">
                                                                     {releaseGroup.firstReleaseDate.slice(
                                                                         0,
                                                                         4,
@@ -503,6 +504,7 @@ export function SearchOverlay() {
                                                                         key={
                                                                             secondaryType
                                                                         }
+                                                                        className="shrink-0"
                                                                     >
                                                                         {
                                                                             secondaryType
