@@ -27,11 +27,11 @@ import {
 import {
     GenericCover,
     Icon,
-    InRainbowsCover,
     RatingHistogram,
     Stars,
     StatusGlyph,
-} from "./album-primitives";
+} from "../../_components/primitives";
+import { InRainbowsCover } from "./album-primitives";
 
 export type AlbumHeaderData = {
     title: string;

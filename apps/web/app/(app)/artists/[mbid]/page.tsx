@@ -1,30 +1,119 @@
-type ArtistDetailPageProps = {
-    params: Promise<{
-        mbid: string;
-    }>;
+import { cookies } from "next/headers";
+import { apiBaseUrl } from "../../../../lib/config";
+import ArtistView, {
+    type ArtistProfile,
+    type DiscographyReleaseGroup,
+} from "./artist-view";
+
+type ArtistRow = {
+    musicbrainzId: string;
+    name: string;
+    sortName: string | null;
+    disambiguation: string | null;
+    country: string | null;
+    foundedYear: number | null;
+    dissolvedYear: number | null;
 };
+
+type ReleaseGroupRow = {
+    musicbrainzId: string;
+    title: string;
+    releaseType: DiscographyReleaseGroup["releaseType"];
+    secondaryTypes: string[] | null;
+    firstReleaseDate: string | null;
+    coverArtUrl: string | null;
+};
+
+function toProfile(row: ArtistRow): ArtistProfile {
+    return {
+        mbid: row.musicbrainzId,
+        name: row.name,
+        disambiguation: row.disambiguation,
+        country: row.country,
+        foundedYear: row.foundedYear,
+        dissolvedYear: row.dissolvedYear,
+        imageUrl: null,
+    };
+}
+
+function toDiscographyItem(row: ReleaseGroupRow): DiscographyReleaseGroup {
+    return {
+        mbid: row.musicbrainzId,
+        title: row.title,
+        releaseType: row.releaseType,
+        secondaryTypes: row.secondaryTypes ?? [],
+        firstReleaseDate: row.firstReleaseDate,
+    };
+}
+
+async function apiFetch(path: string, cookieHeader: string) {
+    return fetch(new URL(path, apiBaseUrl), {
+        headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+        cache: "no-store",
+    });
+}
 
 export default async function ArtistDetailPage({
     params,
-}: ArtistDetailPageProps) {
+}: {
+    params: Promise<{ mbid: string }>;
+}) {
     const { mbid } = await params;
+    const cookieStore = await cookies();
+    const cookieHeader = cookieStore.toString();
+
+    let profile: ArtistProfile | null = null;
+    let releaseGroups: DiscographyReleaseGroup[] | null = null;
+    let canonicalReleaseGroups: DiscographyReleaseGroup[] | null = null;
+
+    try {
+        const [profileRes, discographyRes, canonicalRes] = await Promise.all([
+            apiFetch(`catalog/artists/${mbid}`, cookieHeader),
+            apiFetch(`catalog/artists/${mbid}/release-groups`, cookieHeader),
+            apiFetch(
+                `catalog/artists/${mbid}/release-groups?canonical=true`,
+                cookieHeader,
+            ),
+        ]);
+
+        if (profileRes.ok) {
+            const payload = (await profileRes.json()) as
+                | { artist: ArtistRow }
+                | { jobId: string };
+            if ("artist" in payload) profile = toProfile(payload.artist);
+        }
+
+        if (discographyRes.ok) {
+            const payload = (await discographyRes.json()) as
+                | { artist: ArtistRow; releaseGroups: ReleaseGroupRow[] }
+                | { jobId?: string; pendingReleaseGroupCount?: number };
+            if ("releaseGroups" in payload && payload.releaseGroups) {
+                releaseGroups = payload.releaseGroups.map(toDiscographyItem);
+                if (!profile && "artist" in payload && payload.artist) {
+                    profile = toProfile(payload.artist);
+                }
+            }
+        }
+
+        if (canonicalRes.ok) {
+            const payload = (await canonicalRes.json()) as
+                | { artist: ArtistRow; releaseGroups: ReleaseGroupRow[] }
+                | { jobId?: string; pendingReleaseGroupCount?: number };
+            if ("releaseGroups" in payload && payload.releaseGroups) {
+                canonicalReleaseGroups =
+                    payload.releaseGroups.map(toDiscographyItem);
+            }
+        }
+    } catch {
+        // fall through — client will poll
+    }
 
     return (
-        <main className="max-w-150 mx-auto px-6 pt-16 pb-20">
-            <p className="mb-3 text-micro uppercase tracking-[0.18em] text-steel">
-                Artist
-            </p>
-            <h1 className="text-[46px] font-medium text-paper tracking-[-0.02em] leading-[1.05] mb-4">
-                Artist page scaffolded
-            </h1>
-            <p className="max-w-90 text-body leading-[1.65] text-steel">
-                Detail UI is not implemented yet. This route exists so global
-                search can navigate somewhere real while the artist experience
-                is still being built.
-            </p>
-            <div className="mt-8 rounded-md border-[0.5px] border-(--hairline) bg-surface px-4 py-4 text-caption text-paper">
-                MBID: <span className="text-steel">{mbid}</span>
-            </div>
-        </main>
+        <ArtistView
+            mbid={mbid}
+            initialProfile={profile}
+            initialReleaseGroups={releaseGroups}
+            initialCanonicalReleaseGroups={canonicalReleaseGroups}
+        />
     );
 }
