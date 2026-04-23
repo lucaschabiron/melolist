@@ -14,7 +14,11 @@ type IconName =
     | "external"
     | "plus"
     | "check"
-    | "x";
+    | "x"
+    | "user"
+    | "settings"
+    | "logout"
+    | "pin";
 
 export function Icon({
     name,
@@ -107,6 +111,35 @@ export function Icon({
             return (
                 <svg {...p}>
                     <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+            );
+        case "user":
+            return (
+                <svg {...p}>
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M4 21a8 8 0 0 1 16 0" />
+                </svg>
+            );
+        case "settings":
+            return (
+                <svg {...p}>
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h.1a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+                </svg>
+            );
+        case "logout":
+            return (
+                <svg {...p}>
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <path d="m16 17 5-5-5-5" />
+                    <path d="M21 12H9" />
+                </svg>
+            );
+        case "pin":
+            return (
+                <svg {...p}>
+                    <path d="M12 17v5" />
+                    <path d="M9 10V4h6v6l2 4H7l2-4z" />
                 </svg>
             );
         default:
@@ -346,6 +379,99 @@ export function RatingHistogram({
                     }}
                 />
             ))}
+        </div>
+    );
+}
+
+const COVER_PALETTES: Array<[string, string, string]> = [
+    ["#241106", "#5b3a1e", "#8a5a2e"],
+    ["#0a1a2a", "#1e4a6b", "#3a6b8a"],
+    ["#2a0a2a", "#5b1e5b", "#8a2e7a"],
+    ["#14281a", "#2e5b3a", "#4a8a5b"],
+    ["#2a140a", "#6b3a1e", "#a85a3e"],
+    ["#14141a", "#2e2e4a", "#4a4a6b"],
+    ["#0a1a0a", "#1e3a1e", "#2e5b2e"],
+    ["#1a1408", "#3a2e14", "#5b4a24"],
+    ["#08141a", "#14283a", "#1e3a5b"],
+];
+
+export function coverPalette(seed: string): [string, string, string] {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+        hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+    }
+    return COVER_PALETTES[Math.abs(hash) % COVER_PALETTES.length]!;
+}
+
+const AVATAR_PALETTES: Array<[string, string]> = [
+    ["#2a140a", "#6b3a1e"],
+    ["#0a1a2a", "#1e4a6b"],
+    ["#2a0a2a", "#5b1e5b"],
+    ["#14281a", "#2e5b3a"],
+    ["#1a1408", "#3a2e14"],
+    ["#14141a", "#2e2e4a"],
+    ["#0a1a0a", "#1e3a1e"],
+    ["#241106", "#5b3a1e"],
+];
+
+function avatarPalette(seed: string): [string, string] {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+        hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+    }
+    return AVATAR_PALETTES[Math.abs(hash) % AVATAR_PALETTES.length]!;
+}
+
+function initialsFor(name: string | null | undefined) {
+    if (!name) return "·";
+    const parts = name
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2);
+    if (parts.length === 0) return "·";
+    return parts.map((p) => p[0]!.toUpperCase()).join("");
+}
+
+export function Avatar({
+    imageUrl,
+    name,
+    seed,
+    size = 36,
+    className = "",
+}: {
+    imageUrl: string | null | undefined;
+    name: string | null | undefined;
+    seed: string;
+    size?: number;
+    className?: string;
+}) {
+    const [a, b] = avatarPalette(seed);
+    if (imageUrl) {
+        return (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+                src={imageUrl}
+                alt={name ?? "avatar"}
+                width={size}
+                height={size}
+                className={`rounded-full object-cover shrink-0 ${className}`}
+                style={{ width: size, height: size }}
+            />
+        );
+    }
+    return (
+        <div
+            className={`rounded-full flex items-center justify-center shrink-0 text-paper font-medium ${className}`}
+            style={{
+                width: size,
+                height: size,
+                background: `linear-gradient(135deg, ${a}, ${b})`,
+                fontSize: Math.round(size * 0.4),
+                letterSpacing: "0.02em",
+            }}
+        >
+            {initialsFor(name)}
         </div>
     );
 }
