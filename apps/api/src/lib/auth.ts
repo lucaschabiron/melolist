@@ -14,6 +14,8 @@ const cookieDomain = process.env.COOKIE_DOMAIN?.trim();
 const normalizedCookieDomain = cookieDomain?.replace(/^\./, "");
 const isUnsupportedPublicCookieDomain =
     normalizedCookieDomain === "railway.app";
+const appEnv = process.env.APP_ENV?.trim().toLowerCase() ?? "development";
+const isProduction = appEnv === "production";
 if (isUnsupportedPublicCookieDomain) {
     console.warn(
         "[auth] COOKIE_DOMAIN=.railway.app is too broad for Railway preview domains. Use a concrete parent domain such as .up.railway.app.",
@@ -172,7 +174,7 @@ export const auth = betterAuth({
               },
               defaultCookieAttributes: {
                   sameSite: "lax",
-                  secure: true,
+                  secure: isProduction,
               },
           }
         : undefined,
