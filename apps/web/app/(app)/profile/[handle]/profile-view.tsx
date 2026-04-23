@@ -28,7 +28,6 @@ export type ProfileData = {
     displayName: string;
     imageUrl: string | null;
     bio: string | null;
-    pronouns: string | null;
     location: string | null;
     isPrivate: boolean;
     joinedAt: string;
@@ -209,7 +208,6 @@ function IdentityBar({
     onToggleFollow: () => void;
 }) {
     const metaParts: string[] = [];
-    if (profile.pronouns) metaParts.push(profile.pronouns);
     if (profile.location) metaParts.push(profile.location);
     metaParts.push(`Joined ${formatJoinedAt(profile.joinedAt)}`);
 

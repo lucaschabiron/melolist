@@ -11,7 +11,6 @@ export type MeResponse = {
     email: string;
     imageUrl: string | null;
     bio: string | null;
-    pronouns: string | null;
     location: string | null;
     isPrivate: boolean;
     pinnedReleaseGroupIds: string[];
@@ -219,18 +218,15 @@ function SectionCard({
 
 function ProfileTab({ me }: { me: MeResponse }) {
     const bioId = useId();
-    const pronounsId = useId();
     const locationId = useId();
 
     const [bio, setBio] = useState(me.bio ?? "");
-    const [pronouns, setPronouns] = useState(me.pronouns ?? "");
     const [location, setLocation] = useState(me.location ?? "");
     const [state, setState] = useState<SaveState>("idle");
     const [isPending, startTransition] = useTransition();
 
     const dirty =
         bio !== (me.bio ?? "") ||
-        pronouns !== (me.pronouns ?? "") ||
         location !== (me.location ?? "");
 
     const save = () => {
@@ -238,7 +234,6 @@ function ProfileTab({ me }: { me: MeResponse }) {
         startTransition(() => {
             void patchMe({
                 bio: bio.trim() === "" ? null : bio,
-                pronouns: pronouns.trim() === "" ? null : pronouns,
                 location: location.trim() === "" ? null : location,
             })
                 .then(() => {
@@ -295,25 +290,14 @@ function ProfileTab({ me }: { me: MeResponse }) {
                             Markdown coming later — plain text for now.
                         </FieldHint>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        <div>
-                            <Label htmlFor={pronounsId}>Pronouns</Label>
-                            <TextInput
-                                id={pronounsId}
-                                value={pronouns}
-                                onChange={setPronouns}
-                                placeholder="she/her, they/them…"
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor={locationId}>Location</Label>
-                            <TextInput
-                                id={locationId}
-                                value={location}
-                                onChange={setLocation}
-                                placeholder="Lyon, FR"
-                            />
-                        </div>
+                    <div>
+                        <Label htmlFor={locationId}>Location</Label>
+                        <TextInput
+                            id={locationId}
+                            value={location}
+                            onChange={setLocation}
+                            placeholder="Lyon, FR"
+                        />
                     </div>
                 </div>
                 <div className="mt-6 flex items-center justify-end gap-4">
