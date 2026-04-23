@@ -6,7 +6,6 @@ export const userProfileTable = pgTable("user_profile", {
         .primaryKey()
         .references(() => user.id, { onDelete: "cascade" }),
     bio: text(),
-    pronouns: text(),
     location: text(),
     isPrivate: boolean().notNull().default(false),
     pinnedReleaseGroupIds: uuid().array().notNull().default([]),

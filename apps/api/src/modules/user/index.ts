@@ -65,7 +65,6 @@ export const userController = new Elysia({
                 email: user.email,
                 imageUrl: user.image ?? null,
                 bio: profile?.bio ?? null,
-                pronouns: profile?.pronouns ?? null,
                 location: profile?.location ?? null,
                 isPrivate: profile?.isPrivate ?? false,
                 pinnedReleaseGroupIds: profile?.pinnedReleaseGroupIds ?? [],
@@ -92,20 +91,24 @@ export const userController = new Elysia({
                 .where(eq(userProfileTable.userId, targetUser.id))
                 .limit(1);
 
-            const pinnedReleaseGroups = await hydratePins(
-                profile?.pinnedReleaseGroupIds ?? [],
-            );
+            const isOwnProfile = currentUser.id === targetUser.id;
+            const isPrivate = profile?.isPrivate ?? false;
+            const hidePrivateFields = isPrivate && !isOwnProfile;
+            const pinnedReleaseGroups = hidePrivateFields
+                ? []
+                : await hydratePins(profile?.pinnedReleaseGroupIds ?? []);
 
             return {
                 handle: targetUser.username ?? handleLower,
                 displayName: targetUser.name,
                 imageUrl: targetUser.image ?? null,
-                bio: profile?.bio ?? null,
-                pronouns: profile?.pronouns ?? null,
-                location: profile?.location ?? null,
-                isPrivate: profile?.isPrivate ?? false,
+                bio: hidePrivateFields ? null : (profile?.bio ?? null),
+                location: hidePrivateFields
+                    ? null
+                    : (profile?.location ?? null),
+                isPrivate,
                 joinedAt: targetUser.createdAt.toISOString(),
-                isOwnProfile: currentUser.id === targetUser.id,
+                isOwnProfile,
                 pinnedReleaseGroups,
             };
         },
@@ -135,7 +138,6 @@ export const userController = new Elysia({
 
             const updates: Partial<typeof userProfileTable.$inferInsert> = {};
             if (body.bio !== undefined) updates.bio = body.bio;
-            if (body.pronouns !== undefined) updates.pronouns = body.pronouns;
             if (body.location !== undefined) updates.location = body.location;
             if (body.isPrivate !== undefined)
                 updates.isPrivate = body.isPrivate;
@@ -156,7 +158,6 @@ export const userController = new Elysia({
             body: t.Partial(
                 t.Object({
                     bio: t.Union([t.String(), t.Null()]),
-                    pronouns: t.Union([t.String(), t.Null()]),
                     location: t.Union([t.String(), t.Null()]),
                     isPrivate: t.Boolean(),
                     pinnedReleaseGroupIds: t.Array(t.String()),
