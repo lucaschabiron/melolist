@@ -12,13 +12,65 @@ const normalizeUsername = (value: string) => value.toLowerCase();
 const usernamePlugin = username({ usernameNormalization: normalizeUsername });
 const cookieDomain = process.env.COOKIE_DOMAIN?.trim();
 const normalizedCookieDomain = cookieDomain?.replace(/^\./, "");
+const appUrl = process.env.APP_URL;
+const betterAuthUrl = process.env.BETTER_AUTH_URL;
 const isUnsupportedPublicCookieDomain =
     normalizedCookieDomain === "railway.app";
+const appEnv = (
+    process.env.APP_ENV ??
+    process.env.NODE_ENV ??
+    "development"
+)
+    .trim()
+    .toLowerCase();
+const isProduction = appEnv === "production";
+const authDebugEnabled = process.env.AUTH_DEBUG === "true";
+
+const getHostname = (value?: string) => {
+    if (!value) return null;
+    try {
+        return new URL(value).hostname;
+    } catch {
+        return null;
+    }
+};
+
+const appHostname = getHostname(appUrl);
+const apiHostname = getHostname(betterAuthUrl);
+
+if (!process.env.APP_ENV) {
+    console.warn(
+        `[auth] APP_ENV is not set. Falling back to "${appEnv}" (APP_ENV -> NODE_ENV -> development).`,
+    );
+}
+
+if (
+    appHostname &&
+    apiHostname &&
+    appHostname !== apiHostname &&
+    !cookieDomain
+) {
+    console.warn(
+        `[auth] APP_URL (${appHostname}) and BETTER_AUTH_URL (${apiHostname}) differ, but COOKIE_DOMAIN is not set. Sessions may not persist across subdomains.`,
+    );
+}
+
 if (isUnsupportedPublicCookieDomain) {
     console.warn(
         "[auth] COOKIE_DOMAIN=.railway.app is too broad for Railway preview domains. Use a concrete parent domain such as .up.railway.app.",
     );
 }
+
+const logAuthDebug = (
+    event: string,
+    details: Record<string, string | number | boolean | null | undefined>,
+) => {
+    if (!authDebugEnabled) {
+        return;
+    }
+
+    console.info(`[auth-debug] ${event}`, details);
+};
 
 type ExistingUser = {
     id: string;
@@ -172,7 +224,7 @@ export const auth = betterAuth({
               },
               defaultCookieAttributes: {
                   sameSite: "lax",
-                  secure: true,
+                  secure: isProduction,
               },
           }
         : undefined,
@@ -189,6 +241,25 @@ export const auth = betterAuth({
     },
     hooks: {
         before: createAuthMiddleware(async (ctx) => {
+            if (ctx.path === "/sign-in/email" || ctx.path === "/get-session") {
+                const cookieHeader = ctx.request.headers.get("cookie");
+                const sessionCookiePresent =
+                    cookieHeader?.includes("better-auth.session_token") ??
+                    false;
+
+                logAuthDebug("incoming-auth-request", {
+                    path: ctx.path,
+                    method: ctx.request.method,
+                    origin: ctx.request.headers.get("origin"),
+                    host: ctx.request.headers.get("host"),
+                    hasCookieHeader: Boolean(cookieHeader),
+                    sessionCookiePresent,
+                    cookieDomain: cookieDomain ?? null,
+                    appEnv,
+                    secureCookies: isProduction,
+                });
+            }
+
             if (ctx.path !== "/sign-up/email") {
                 return;
             }
