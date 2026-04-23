@@ -169,13 +169,9 @@ export const auth = betterAuth({
         user: {
             create: {
                 after: async (user) => {
-                    const handle =
-                        (user as { username?: string }).username ??
-                        `user_${user.id.slice(0, 8)}`;
-                    await db.insert(userProfileTable).values({
-                        userId: user.id,
-                        handle,
-                    });
+                    await db
+                        .insert(userProfileTable)
+                        .values({ userId: user.id });
                 },
             },
         },
