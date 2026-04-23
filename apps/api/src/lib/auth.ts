@@ -10,6 +10,16 @@ import { db, userProfileTable } from "@melolist/db";
 const UNVERIFIED_ACCOUNT_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const normalizeUsername = (value: string) => value.toLowerCase();
 const usernamePlugin = username({ usernameNormalization: normalizeUsername });
+const cookieDomain = process.env.COOKIE_DOMAIN?.trim();
+const normalizedCookieDomain = cookieDomain?.replace(/^\./, "");
+const isUnsupportedPublicCookieDomain =
+    normalizedCookieDomain === "railway.app";
+if (isUnsupportedPublicCookieDomain) {
+    console.warn(
+        "[auth] COOKIE_DOMAIN=.railway.app is too broad for Railway preview domains. Use a concrete parent domain such as .up.railway.app.",
+    );
+}
+
 type ExistingUser = {
     id: string;
     email: string;
@@ -153,11 +163,12 @@ export const auth = betterAuth({
     },
     plugins: [usernamePlugin],
     trustedOrigins: [process.env.APP_URL ?? "http://localhost:3001"],
-    advanced: process.env.COOKIE_DOMAIN
+    advanced:
+        cookieDomain && !isUnsupportedPublicCookieDomain
         ? {
               crossSubDomainCookies: {
                   enabled: true,
-                  domain: process.env.COOKIE_DOMAIN,
+                  domain: cookieDomain,
               },
               defaultCookieAttributes: {
                   sameSite: "lax",
@@ -169,13 +180,9 @@ export const auth = betterAuth({
         user: {
             create: {
                 after: async (user) => {
-                    const handle =
-                        (user as { username?: string }).username ??
-                        `user_${user.id.slice(0, 8)}`;
-                    await db.insert(userProfileTable).values({
-                        userId: user.id,
-                        handle,
-                    });
+                    await db
+                        .insert(userProfileTable)
+                        .values({ userId: user.id });
                 },
             },
         },
