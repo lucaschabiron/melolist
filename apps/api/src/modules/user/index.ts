@@ -3,10 +3,20 @@ import {
     db,
     eq,
     inArray,
+    or,
     releaseGroup,
     userProfileTable,
     user as userTable,
 } from "@melolist/db";
+import {
+    avatarKey,
+    deleteObject,
+    InvalidImageError,
+    keyFromPublicUrl,
+    processAvatar,
+    publicUrl,
+    putObject,
+} from "@melolist/storage";
 import { authPlugin } from "../../lib/auth-plugin";
 
 const MAX_PINNED_ALBUMS = 4;
@@ -26,14 +36,19 @@ async function hydratePins(ids: string[]) {
             coverArtUrl: releaseGroup.coverArtUrl,
         })
         .from(releaseGroup)
-        .where(inArray(releaseGroup.id, ids));
+        .where(
+            or(
+                inArray(releaseGroup.id, ids),
+                inArray(releaseGroup.musicbrainzId, ids),
+            ),
+        );
 
-    const byId = new Map(rows.map((r) => [r.id, r]));
+    const byId = new Map(
+        rows.flatMap((r) => [[r.id, r] as const, [r.mbid, r] as const]),
+    );
     return ids
         .map((id) => byId.get(id))
-        .filter(
-            (r): r is NonNullable<typeof r> => r != null && r.mbid != null,
-        )
+        .filter((r): r is NonNullable<typeof r> => r != null && r.mbid != null)
         .map((r) => ({
             mbid: r.mbid!,
             title: r.title,
@@ -41,6 +56,25 @@ async function hydratePins(ids: string[]) {
             firstReleaseDate: r.firstReleaseDate,
             coverArtUrl: r.coverArtUrl,
         }));
+}
+
+async function pinnedReleaseGroupsExist(ids: string[]) {
+    if (ids.length === 0) return true;
+    const rows = await db
+        .select({
+            id: releaseGroup.id,
+            mbid: releaseGroup.musicbrainzId,
+        })
+        .from(releaseGroup)
+        .where(
+            or(
+                inArray(releaseGroup.id, ids),
+                inArray(releaseGroup.musicbrainzId, ids),
+            ),
+        );
+
+    const found = new Set(rows.flatMap((r) => [r.id, r.mbid]));
+    return ids.every((id) => found.has(id));
 }
 
 export const userController = new Elysia({
@@ -61,7 +95,7 @@ export const userController = new Elysia({
             return {
                 id: user.id,
                 handle: user.username ?? null,
-                displayName: user.name,
+                displayName: user.username ?? user.name,
                 email: user.email,
                 imageUrl: user.image ?? null,
                 bio: profile?.bio ?? null,
@@ -100,7 +134,7 @@ export const userController = new Elysia({
 
             return {
                 handle: targetUser.username ?? handleLower,
-                displayName: targetUser.name,
+                displayName: targetUser.username ?? targetUser.name,
                 imageUrl: targetUser.image ?? null,
                 bio: hidePrivateFields ? null : (profile?.bio ?? null),
                 location: hidePrivateFields
@@ -109,6 +143,7 @@ export const userController = new Elysia({
                 isPrivate,
                 joinedAt: targetUser.createdAt.toISOString(),
                 isOwnProfile,
+                privateProfile: hidePrivateFields,
                 pinnedReleaseGroups,
             };
         },
@@ -116,6 +151,79 @@ export const userController = new Elysia({
             auth: true,
             params: t.Object({ handle: t.String() }),
         },
+    )
+
+    .post(
+        "/me/avatar",
+        async ({ body, user, status }) => {
+            const file = body.file;
+            if (!file) return status(400, { error: "file is required" });
+
+            try {
+                const buffer = await file.arrayBuffer();
+                const { buffer: resized, contentType } = await processAvatar(
+                    buffer,
+                    file.type,
+                );
+                const key = avatarKey(user.id);
+                await putObject(key, resized, contentType);
+                const newUrl = publicUrl(key);
+
+                const previousKey = keyFromPublicUrl(user.image);
+
+                try {
+                    await db
+                        .update(userTable)
+                        .set({ image: newUrl })
+                        .where(eq(userTable.id, user.id));
+                } catch (err) {
+                    void deleteObject(key).catch(() => {});
+                    throw err;
+                }
+
+                if (previousKey) {
+                    void deleteObject(previousKey).catch(() => {});
+                }
+
+                return { imageUrl: newUrl };
+            } catch (err) {
+                if (err instanceof InvalidImageError) {
+                    return status(400, { error: err.message });
+                }
+                throw err;
+            }
+        },
+        {
+            auth: true,
+            body: t.Object({
+                file: t.File({
+                    type: [
+                        "image/jpeg",
+                        "image/png",
+                        "image/webp",
+                        "image/gif",
+                        "image/avif",
+                    ],
+                    maxSize: "5m",
+                }),
+            }),
+        },
+    )
+
+    .delete(
+        "/me/avatar",
+        async ({ user }) => {
+            const previousKey = keyFromPublicUrl(user.image);
+            await db
+                .update(userTable)
+                .set({ image: null })
+                .where(eq(userTable.id, user.id));
+            if (previousKey) {
+                void deleteObject(previousKey).catch(() => {});
+            }
+            return { ok: true };
+        },
+        { auth: true },
     )
 
     .patch(
@@ -133,6 +241,15 @@ export const userController = new Elysia({
                             error: "invalid release group id",
                         });
                     }
+                }
+                if (
+                    !(await pinnedReleaseGroupsExist(
+                        body.pinnedReleaseGroupIds,
+                    ))
+                ) {
+                    return status(400, {
+                        error: "pinned albums must exist in the catalog",
+                    });
                 }
             }
 

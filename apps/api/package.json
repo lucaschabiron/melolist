@@ -17,6 +17,7 @@
         "@melolist/db": "workspace:*",
         "@melolist/musicbrainz": "workspace:*",
         "@melolist/queue": "workspace:*",
+        "@melolist/storage": "workspace:*",
         "better-auth": "^1.6.5",
         "drizzle-kit": "^0.31.10",
         "elysia": "latest"

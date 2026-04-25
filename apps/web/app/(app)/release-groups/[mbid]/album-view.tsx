@@ -245,8 +245,8 @@ function AlbumHeader({
                                 className="text-caption text-steel mt-2"
                                 style={{ fontVariantNumeric: "tabular-nums" }}
                             >
-                                based on{" "}
-                                {ALBUM.ratingsCount.toLocaleString()} ratings
+                                based on {ALBUM.ratingsCount.toLocaleString()}{" "}
+                                ratings
                             </div>
                         </div>
                         {showHistogram && (
@@ -635,7 +635,7 @@ function Sidebar() {
                             Autumn, slowly
                         </a>
                         <div className="text-steel mt-[2px]">
-                            by @priya.shah · 48 albums
+                            by priya.shah · 48 albums
                         </div>
                     </div>
                     <div>
@@ -643,7 +643,7 @@ function Sidebar() {
                             Records I revisit every year
                         </a>
                         <div className="text-steel mt-[2px]">
-                            by @mrinehart · 24 albums
+                            by mrinehart · 24 albums
                         </div>
                     </div>
                     <div>
@@ -651,7 +651,7 @@ function Sidebar() {
                             The case for the 2000s
                         </a>
                         <div className="text-steel mt-[2px]">
-                            by @hanabyrne · 60 albums
+                            by hanabyrne · 60 albums
                         </div>
                     </div>
                 </div>
@@ -978,8 +978,7 @@ function EditionCard({ edition }: { edition: Edition }) {
                             width: 90,
                             height: 90,
                             borderRadius: 8,
-                            boxShadow:
-                                "inset 0 0 0 1px rgba(247,247,247,0.15)",
+                            boxShadow: "inset 0 0 0 1px rgba(247,247,247,0.15)",
                         }}
                     />
                 )}
@@ -1046,10 +1045,7 @@ function EditionsRow() {
 
 function RelatedCard({ item }: { item: RelatedItem }) {
     return (
-        <a
-            href="#"
-            className="w-[160px] shrink-0 no-underline text-paper"
-        >
+        <a href="#" className="w-[160px] shrink-0 no-underline text-paper">
             <GenericCover
                 size={160}
                 radius={8}
@@ -1306,9 +1302,7 @@ export default function AlbumView({
                 <EditionsRow />
 
                 <div className="h-16 md:h-24" />
-                <RelatedSections
-                    artistName={header?.artist ?? ALBUM.artist}
-                />
+                <RelatedSections artistName={header?.artist ?? ALBUM.artist} />
 
                 <div className="h-16 md:h-24" />
             </main>

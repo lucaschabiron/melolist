@@ -6,17 +6,21 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient, signIn } from "../../lib/auth-client";
 
-type FieldErrors = { email?: string; password?: string; form?: string };
+type FieldErrors = { identifier?: string; password?: string; form?: string };
 
 export default function LoginPage() {
     const router = useRouter();
-    const [email, setEmail] = useState("");
+    const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
     const [errors, setErrors] = useState<FieldErrors>({});
     const [loading, setLoading] = useState(false);
     const [needsVerification, setNeedsVerification] = useState(false);
     const [resending, setResending] = useState(false);
     const [resendMessage, setResendMessage] = useState<string | null>(null);
+
+    const trimmedIdentifier = identifier.trim();
+    const isEmail = trimmedIdentifier.includes("@");
+    const verificationEmail = isEmail ? trimmedIdentifier : null;
 
     const callbackURL =
         typeof window === "undefined"
@@ -25,7 +29,19 @@ export default function LoginPage() {
 
     const validate = (): FieldErrors => {
         const e: FieldErrors = {};
-        if (!email.includes("@")) e.email = "Enter a valid email address.";
+        if (trimmedIdentifier.length === 0) {
+            e.identifier = "Enter your email or username.";
+        } else if (
+            trimmedIdentifier.includes("@") &&
+            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedIdentifier)
+        ) {
+            e.identifier = "Enter a valid email address.";
+        } else if (
+            !trimmedIdentifier.includes("@") &&
+            trimmedIdentifier.length < 3
+        ) {
+            e.identifier = "Username must be at least 3 characters.";
+        }
         if (password.length < 6)
             e.password = "Password must be at least 6 characters.";
         return e;
@@ -41,7 +57,16 @@ export default function LoginPage() {
         setLoading(true);
         setNeedsVerification(false);
         setResendMessage(null);
-        const { error } = await signIn.email({ email, password, callbackURL });
+        const { error } = isEmail
+            ? await signIn.email({
+                  email: trimmedIdentifier,
+                  password,
+                  callbackURL,
+              })
+            : await signIn.username({
+                  username: trimmedIdentifier,
+                  password,
+              });
         setLoading(false);
         if (error) {
             const errorCode = (error as { code?: string } | null)?.code;
@@ -60,11 +85,12 @@ export default function LoginPage() {
     };
 
     const handleResendVerification = async () => {
+        if (!verificationEmail) return;
         setResending(true);
         setResendMessage(null);
 
         const { error } = await authClient.sendVerificationEmail({
-            email,
+            email: verificationEmail,
             callbackURL,
         });
 
@@ -98,16 +124,19 @@ export default function LoginPage() {
                     </p>
 
                     <Field
-                        id="email"
-                        label="Email"
-                        type="email"
-                        autoComplete="email"
-                        placeholder="you@example.com"
-                        value={email}
-                        error={errors.email}
+                        id="identifier"
+                        label="Email or username"
+                        type="text"
+                        autoComplete="username"
+                        placeholder="you@example.com or handle"
+                        value={identifier}
+                        error={errors.identifier}
                         onChange={(v) => {
-                            setEmail(v);
-                            setErrors((er) => ({ ...er, email: undefined }));
+                            setIdentifier(v);
+                            setErrors((er) => ({
+                                ...er,
+                                identifier: undefined,
+                            }));
                         }}
                     />
 
@@ -139,7 +168,7 @@ export default function LoginPage() {
                             {errors.form}
                         </div>
                     )}
-                    {needsVerification && (
+                    {needsVerification && verificationEmail && (
                         <div className="mb-3">
                             <button
                                 type="button"

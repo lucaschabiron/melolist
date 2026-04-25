@@ -262,3 +262,20 @@ export async function searchCatalog(
         },
     };
 }
+
+export async function searchCatalogReleaseGroups(query: string) {
+    const trimmedQuery = query.trim();
+    const normalizedQuery = normalizeSearchQuery(trimmedQuery);
+
+    const localReleaseGroups = await searchLocalReleaseGroups(normalizedQuery);
+
+    return {
+        query: trimmedQuery,
+        releaseGroups: localReleaseGroups,
+        meta: {
+            localCount: localReleaseGroups.length,
+            returnedCount: localReleaseGroups.length,
+            usedRemoteFallback: false,
+        },
+    };
+}

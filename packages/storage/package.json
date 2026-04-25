@@ -1,0 +1,14 @@
+{
+    "name": "@melolist/storage",
+    "version": "0.0.0",
+    "private": true,
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "dependencies": {
+        "sharp": "^0.34.2"
+    },
+    "devDependencies": {
+        "bun-types": "latest"
+    }
+}

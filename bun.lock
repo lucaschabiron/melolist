@@ -18,6 +18,7 @@
         "@melolist/db": "workspace:*",
         "@melolist/musicbrainz": "workspace:*",
         "@melolist/queue": "workspace:*",
+        "@melolist/storage": "workspace:*",
         "better-auth": "^1.6.5",
         "drizzle-kit": "^0.31.10",
         "elysia": "latest",
@@ -110,6 +111,16 @@
       "dependencies": {
         "bullmq": "^5.55.0",
         "ioredis": "^5.4.1",
+      },
+    },
+    "packages/storage": {
+      "name": "@melolist/storage",
+      "version": "0.0.0",
+      "dependencies": {
+        "sharp": "^0.34.2",
+      },
+      "devDependencies": {
+        "bun-types": "latest",
       },
     },
     "packages/typescript-config": {
@@ -303,6 +314,8 @@
     "@melolist/musicbrainz": ["@melolist/musicbrainz@workspace:packages/musicbrainz"],
 
     "@melolist/queue": ["@melolist/queue@workspace:packages/queue"],
+
+    "@melolist/storage": ["@melolist/storage@workspace:packages/storage"],
 
     "@melolist/typescript-config": ["@melolist/typescript-config@workspace:packages/typescript-config"],
 

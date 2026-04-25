@@ -46,8 +46,8 @@ export default function Home() {
     const { data: session, isPending } = useSession();
     if (isPending || !session) return null;
 
-    const firstName = session.user.name.split(" ")[0] ?? session.user.name;
-    const greeting = `${greetingFor(new Date())}, ${firstName}.`;
+    const handle = session.user.username ?? session.user.name;
+    const greeting = `${greetingFor(new Date())}, ${handle}.`;
 
     return (
         <main className="max-w-150 mx-auto px-6 pt-16 pb-20">

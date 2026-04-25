@@ -6,6 +6,7 @@ import {
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { username } from "better-auth/plugins";
 import { db, userProfileTable } from "@melolist/db";
+import { deleteObject, keyFromPublicUrl } from "@melolist/storage";
 
 const UNVERIFIED_ACCOUNT_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const normalizeUsername = (value: string) => value.toLowerCase();
@@ -65,7 +66,6 @@ function buildSyntheticPendingUser(body: {
     name: string;
     image?: string;
     username?: string;
-    displayUsername?: string;
 }) {
     const now = new Date();
 
@@ -79,9 +79,6 @@ function buildSyntheticPendingUser(body: {
         updatedAt: now,
         ...(typeof body.username === "string"
             ? { username: normalizeUsername(body.username) }
-            : {}),
-        ...(typeof body.displayUsername === "string"
-            ? { displayUsername: body.displayUsername }
             : {}),
     };
 }
@@ -165,6 +162,21 @@ export const auth = betterAuth({
               },
           }
         : undefined,
+    user: {
+        deleteUser: {
+            enabled: true,
+            beforeDelete: async (user) => {
+                const key = keyFromPublicUrl(user.image ?? null);
+                if (key) {
+                    try {
+                        await deleteObject(key);
+                    } catch {
+                        // best-effort — don't block deletion on storage errors
+                    }
+                }
+            },
+        },
+    },
     databaseHooks: {
         user: {
             create: {
@@ -178,6 +190,15 @@ export const auth = betterAuth({
     },
     hooks: {
         before: createAuthMiddleware(async (ctx) => {
+            if (
+                ctx.path === "/update-user" &&
+                typeof ctx.body.username === "string"
+            ) {
+                const normalizedUsername = normalizeUsername(ctx.body.username);
+                ctx.body.name = normalizedUsername;
+                ctx.body.displayUsername = normalizedUsername;
+            }
+
             if (ctx.path !== "/sign-up/email") {
                 return;
             }
@@ -221,10 +242,6 @@ export const auth = betterAuth({
                                 username:
                                     typeof ctx.body.username === "string"
                                         ? ctx.body.username
-                                        : undefined,
-                                displayUsername:
-                                    typeof ctx.body.displayUsername === "string"
-                                        ? ctx.body.displayUsername
                                         : undefined,
                             }),
                         });

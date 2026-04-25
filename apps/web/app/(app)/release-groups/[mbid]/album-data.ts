@@ -120,7 +120,7 @@ export const ARCHIVED_REVIEWS: ArchivedReview[] = [
 export const COMMUNITY_REVIEWS: CommunityReview[] = [
     {
         name: "Marcus Rinehart",
-        handle: "@mrinehart",
+        handle: "mrinehart",
         color: "#5a4a3a",
         date: "2 April 2026",
         rating: 10,
@@ -130,7 +130,7 @@ export const COMMUNITY_REVIEWS: CommunityReview[] = [
     },
     {
         name: "Priya Shah",
-        handle: "@priya.shah",
+        handle: "priya.shah",
         color: "#3a4a5b",
         date: "28 March 2026",
         rating: 9.5,
@@ -140,7 +140,7 @@ export const COMMUNITY_REVIEWS: CommunityReview[] = [
     },
     {
         name: "Daniel Ooi",
-        handle: "@danooi",
+        handle: "danooi",
         color: "#4a3a5b",
         date: "17 March 2026",
         rating: 8,
@@ -150,7 +150,7 @@ export const COMMUNITY_REVIEWS: CommunityReview[] = [
     },
     {
         name: "Hana Byrne",
-        handle: "@hanabyrne",
+        handle: "hanabyrne",
         color: "#5a3a4a",
         date: "9 March 2026",
         rating: 10,
@@ -160,11 +160,11 @@ export const COMMUNITY_REVIEWS: CommunityReview[] = [
     },
     {
         name: "Luca Fontana",
-        handle: "@l.fontana",
+        handle: "l.fontana",
         color: "#3a5b4a",
         date: "1 March 2026",
         rating: 9,
-        body: "Listened to this on vinyl for the first time last month after owning the CD for fifteen years. The low end on \"15 Step\" is a different record on a turntable. Worth hunting down the 2008 pressing.",
+        body: 'Listened to this on vinyl for the first time last month after owning the CD for fifteen years. The low end on "15 Step" is a different record on a turntable. Worth hunting down the 2008 pressing.',
         tags: ["Vinyl"],
         helpful: 62,
     },
@@ -311,7 +311,12 @@ export const ALSO_LIKED: RelatedItem[] = [
     },
 ];
 
-export type StatusId = "backlog" | "listening" | "listened" | "loved" | "shelved";
+export type StatusId =
+    | "backlog"
+    | "listening"
+    | "listened"
+    | "loved"
+    | "shelved";
 
 export const STATUSES: { id: StatusId; label: string }[] = [
     { id: "backlog", label: "Backlog" },

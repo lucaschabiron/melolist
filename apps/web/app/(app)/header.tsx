@@ -30,6 +30,7 @@ function ProfileMenu({
 }) {
     const [open, setOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const publicHandle = user.username ?? user.name;
 
     useEffect(() => {
         if (!open) return;
@@ -67,7 +68,7 @@ function ProfileMenu({
             >
                 <Avatar
                     imageUrl={user.image ?? null}
-                    name={user.name}
+                    name={publicHandle}
                     seed={user.id}
                     size={30}
                 />
@@ -80,13 +81,8 @@ function ProfileMenu({
                 >
                     <div className="px-3 py-2 border-b-[0.5px] border-(--hairline) mb-1">
                         <div className="truncate text-caption font-medium text-paper">
-                            {user.name}
+                            {publicHandle}
                         </div>
-                        {user.username && (
-                            <div className="mt-0.5 truncate text-micro text-steel">
-                                @{user.username}
-                            </div>
-                        )}
                     </div>
                     <MenuItem
                         href={profileHref}

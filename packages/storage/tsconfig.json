@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "strictNullChecks": true,
+        "strict": true,
+        "moduleResolution": "bundler",
+        "module": "esnext",
+        "target": "esnext",
+        "skipLibCheck": true,
+        "types": ["bun-types"]
+    },
+    "include": ["**/*.ts"],
+    "exclude": ["node_modules"]
+}

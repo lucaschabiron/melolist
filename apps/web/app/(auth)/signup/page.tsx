@@ -27,7 +27,7 @@ export default function SignupPage() {
 
     const validate = (): FieldErrors => {
         const e: FieldErrors = {};
-        if (username.trim().length < 2) e.username = "Choose a username.";
+        if (username.trim().length < 3) e.username = "Choose a username.";
         if (!email.includes("@")) e.email = "Enter a valid email address.";
         if (password.length < 8)
             e.password = "Password must be at least 8 characters.";
@@ -36,6 +36,7 @@ export default function SignupPage() {
 
     const handleSubmit = async (ev: React.FormEvent) => {
         ev.preventDefault();
+        const normalizedUsername = username.trim().toLowerCase();
         const v = validate();
         if (Object.keys(v).length) {
             setErrors(v);
@@ -45,8 +46,8 @@ export default function SignupPage() {
         const { error } = await signUp.email({
             email,
             password,
-            name: username,
-            username,
+            name: normalizedUsername,
+            username: normalizedUsername,
             callbackURL,
         });
         setLoading(false);

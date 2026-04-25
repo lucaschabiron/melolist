@@ -7,7 +7,7 @@ import {
     getJobStatus,
 } from "@melolist/queue";
 import { authPlugin } from "../../lib/auth-plugin";
-import { searchCatalog } from "./search";
+import { searchCatalog, searchCatalogReleaseGroups } from "./search";
 const UUID_RE =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -173,6 +173,21 @@ export const catalogController = new Elysia({
             const q = query.q.trim();
             if (q.length < 2) return status(400, { error: "query too short" });
             return searchCatalog(q);
+        },
+        {
+            auth: true,
+            query: t.Object({
+                q: t.String({ minLength: 2 }),
+            }),
+        },
+    )
+
+    .get(
+        "/search/release-groups",
+        async ({ query, status }) => {
+            const q = query.q.trim();
+            if (q.length < 2) return status(400, { error: "query too short" });
+            return searchCatalogReleaseGroups(q);
         },
         {
             auth: true,

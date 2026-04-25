@@ -14,6 +14,12 @@ import {
     type ActivityEntry,
     type ActivityKind,
 } from "./profile-data";
+import {
+    AlbumListTab,
+    ReviewsTab,
+    StatsTab,
+    TrackListTab,
+} from "./profile-tabs";
 
 export type PinnedReleaseGroup = {
     mbid: string;
@@ -32,6 +38,7 @@ export type ProfileData = {
     isPrivate: boolean;
     joinedAt: string;
     isOwnProfile: boolean;
+    privateProfile?: boolean;
     pinnedReleaseGroups: PinnedReleaseGroup[];
 };
 
@@ -91,11 +98,7 @@ function CoverTile({
     );
 }
 
-function Banner({
-    profile,
-}: {
-    profile: ProfileData;
-}) {
+function Banner({ profile }: { profile: ProfileData }) {
     const pins = profile.pinnedReleaseGroups;
     const first = pins[0];
 
@@ -166,8 +169,7 @@ function FannedCovers({ pins }: { pins: PinnedReleaseGroup[] }) {
                         style={{
                             transform: `translate(${tx}px, calc(-50% + ${ty}px)) rotate(${rot}deg)`,
                             zIndex: i + 1,
-                            filter:
-                                "drop-shadow(0 12px 24px rgba(0,0,0,0.5))",
+                            filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.5))",
                         }}
                     >
                         <CoverTile item={pin} size={120} rounded={8} />
@@ -229,7 +231,7 @@ function IdentityBar({
                     >
                         <Avatar
                             imageUrl={profile.imageUrl}
-                            name={profile.displayName}
+                            name={profile.handle}
                             seed={profile.handle}
                             size={112}
                         />
@@ -243,26 +245,23 @@ function IdentityBar({
                             lineHeight: 1.05,
                         }}
                     >
-                        {profile.displayName}
+                        {profile.handle}
                     </h1>
-                    <div
-                        className="mt-1.5 text-caption text-steel truncate"
-                        style={{ fontVariantNumeric: "tabular-nums" }}
-                    >
-                        @{profile.handle}
-                        {metaParts.length > 0 && (
-                            <>
-                                {metaParts.map((part, i) => (
-                                    <Fragment key={i}>
-                                        <span> · </span>
-                                        <span className="whitespace-nowrap">
-                                            {part}
-                                        </span>
-                                    </Fragment>
-                                ))}
-                            </>
-                        )}
-                    </div>
+                    {metaParts.length > 0 && (
+                        <div
+                            className="mt-1.5 text-caption text-steel truncate"
+                            style={{ fontVariantNumeric: "tabular-nums" }}
+                        >
+                            {metaParts.map((part, i) => (
+                                <Fragment key={i}>
+                                    {i > 0 && <span> · </span>}
+                                    <span className="whitespace-nowrap">
+                                        {part}
+                                    </span>
+                                </Fragment>
+                            ))}
+                        </div>
+                    )}
                     {profile.bio && (
                         <p
                             className="mt-4 font-serif text-[16px] text-paper max-w-170 whitespace-pre-line"
@@ -292,9 +291,7 @@ function IdentityBar({
                         className="inline-flex items-center gap-2 px-3.5 py-2.25 rounded-sm bg-transparent text-paper text-caption font-medium cursor-pointer transition-[border-color] duration-120"
                         style={{
                             border: `0.5px solid ${
-                                following
-                                    ? "#F7F7F7"
-                                    : "rgba(107,107,107,0.5)"
+                                following ? "#F7F7F7" : "rgba(107,107,107,0.5)"
                             }`,
                         }}
                     >
@@ -623,20 +620,6 @@ function LatestActivity() {
     );
 }
 
-function TabStub({ label }: { label: string }) {
-    return (
-        <div className="mt-10 rounded-md border-[0.5px] border-(--hairline) bg-surface px-6 py-16 text-center">
-            <div
-                className="text-micro font-medium uppercase text-steel"
-                style={{ letterSpacing: "0.18em" }}
-            >
-                {label}
-            </div>
-            <p className="mt-3 text-caption text-steel">Coming soon.</p>
-        </div>
-    );
-}
-
 function OverviewTab({ profile }: { profile: ProfileData }) {
     return (
         <div className="mt-10 flex flex-col gap-14 md:gap-20">
@@ -650,9 +633,38 @@ function OverviewTab({ profile }: { profile: ProfileData }) {
     );
 }
 
+function PrivateProfile({ profile }: { profile: ProfileData }) {
+    return (
+        <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 md:pt-24 pb-24">
+            <section className="flex flex-col items-center text-center">
+                <Avatar
+                    imageUrl={profile.imageUrl}
+                    name={profile.handle}
+                    seed={profile.handle}
+                    size={112}
+                />
+                <h1
+                    className="mt-6 text-[32px] sm:text-h1 font-medium text-paper"
+                    style={{
+                        letterSpacing: "-0.02em",
+                        lineHeight: 1.05,
+                    }}
+                >
+                    {profile.handle}
+                </h1>
+                <p className="mt-3 text-body text-steel">Private profile</p>
+            </section>
+        </main>
+    );
+}
+
 export default function ProfileView({ profile }: { profile: ProfileData }) {
     const [tab, setTab] = useState<TabId>("overview");
     const [following, setFollowing] = useState(false);
+
+    if (profile.privateProfile) {
+        return <PrivateProfile profile={profile} />;
+    }
 
     return (
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-0">
@@ -665,10 +677,10 @@ export default function ProfileView({ profile }: { profile: ProfileData }) {
             <TabNav tab={tab} onChange={setTab} />
 
             {tab === "overview" && <OverviewTab profile={profile} />}
-            {tab === "albums" && <TabStub label="Album list" />}
-            {tab === "tracks" && <TabStub label="Track list" />}
-            {tab === "stats" && <TabStub label="Stats" />}
-            {tab === "reviews" && <TabStub label="Reviews" />}
+            {tab === "albums" && <AlbumListTab />}
+            {tab === "tracks" && <TrackListTab />}
+            {tab === "stats" && <StatsTab />}
+            {tab === "reviews" && <ReviewsTab />}
 
             <div className="h-20 md:h-32" />
         </main>
