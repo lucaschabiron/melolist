@@ -5,12 +5,18 @@ import {
     notInArray,
     musicbrainzFetchLog,
     release,
+    releaseMedium,
     releaseGroup,
+    releaseTrack,
 } from "@melolist/db";
 import { browseReleasesByReleaseGroup } from "@melolist/musicbrainz";
 import type { Job } from "bullmq";
 import type { MusicbrainzJobData } from "@melolist/queue";
 import { mapReleaseStatus, parseDate } from "../mappers";
+
+function mbidOrNull(value: string | null | undefined): string | null {
+    return value ?? null;
+}
 
 export async function processFetchReleases(
     job: Job<MusicbrainzJobData["fetch-releases"]>,
@@ -53,10 +59,44 @@ export async function processFetchReleases(
                     lastFetchedAt: new Date(),
                 };
 
-                await tx.insert(release).values(values).onConflictDoUpdate({
-                    target: release.musicbrainzId,
-                    set: values,
-                });
+                const [releaseRow] = await tx
+                    .insert(release)
+                    .values(values)
+                    .onConflictDoUpdate({
+                        target: release.musicbrainzId,
+                        set: values,
+                    })
+                    .returning({ id: release.id });
+
+                await tx
+                    .delete(releaseMedium)
+                    .where(eq(releaseMedium.releaseId, releaseRow!.id));
+
+                for (const medium of r.media ?? []) {
+                    const [mediumRow] = await tx
+                        .insert(releaseMedium)
+                        .values({
+                            releaseId: releaseRow!.id,
+                            position: medium.position,
+                            format: medium.format ?? null,
+                            title: medium.title ?? null,
+                            trackCount: medium["track-count"] ?? null,
+                        })
+                        .returning({ id: releaseMedium.id });
+
+                    for (const track of medium.tracks ?? []) {
+                        await tx.insert(releaseTrack).values({
+                            mediumId: mediumRow!.id,
+                            musicbrainzId: mbidOrNull(track.id),
+                            recordingMbid: mbidOrNull(track.recording?.id),
+                            position: track.position,
+                            number: track.number ?? null,
+                            title: track.title,
+                            lengthMs:
+                                track.length ?? track.recording?.length ?? null,
+                        });
+                    }
+                }
             }
 
             if (fetchedReleaseIds.length === 0) {

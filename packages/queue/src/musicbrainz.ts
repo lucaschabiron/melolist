@@ -48,6 +48,15 @@ export async function enqueueFetchArtist(mbid: string) {
     );
 }
 
+export async function enqueueRefreshArtist(mbid: string) {
+    const refreshWindow = Math.floor(Date.now() / (60 * 60 * 1000));
+    return getMusicbrainzQueue().add(
+        "fetch-artist" satisfies MusicbrainzJobName,
+        { mbid } satisfies MusicbrainzJobData["fetch-artist"],
+        { jobId: `refresh-artist_${mbid}_${refreshWindow}` },
+    );
+}
+
 export async function enqueueFetchReleaseGroup(mbid: string) {
     return getMusicbrainzQueue().add(
         "fetch-release-group" satisfies MusicbrainzJobName,
@@ -63,6 +72,17 @@ export async function enqueueFetchReleases(releaseGroupMbid: string) {
             releaseGroupMbid,
         } satisfies MusicbrainzJobData["fetch-releases"],
         { jobId: jobId("fetch-releases", releaseGroupMbid) },
+    );
+}
+
+export async function enqueueRefreshReleases(releaseGroupMbid: string) {
+    const refreshWindow = Math.floor(Date.now() / (60 * 60 * 1000));
+    return getMusicbrainzQueue().add(
+        "fetch-releases" satisfies MusicbrainzJobName,
+        {
+            releaseGroupMbid,
+        } satisfies MusicbrainzJobData["fetch-releases"],
+        { jobId: `refresh-releases_${releaseGroupMbid}_${refreshWindow}` },
     );
 }
 

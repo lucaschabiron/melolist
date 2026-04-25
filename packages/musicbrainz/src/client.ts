@@ -103,7 +103,7 @@ export async function browseReleasesByReleaseGroup(
 
     while (true) {
         const page = await mbFetch<MbBrowseReleases>(
-            `/release?release-group=${releaseGroupMbid}&limit=${limit}&offset=${offset}`,
+            `/release?release-group=${releaseGroupMbid}&limit=${limit}&offset=${offset}&inc=media+recordings`,
         );
         all.push(...page.releases);
         offset += page.releases.length;

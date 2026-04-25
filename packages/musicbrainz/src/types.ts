@@ -64,6 +64,28 @@ export type MbRelease = {
     date?: string | null;
     country?: string | null;
     disambiguation?: string | null;
+    media?: MbMedium[];
+};
+
+export type MbMedium = {
+    position: number;
+    format?: string | null;
+    title?: string | null;
+    "track-count"?: number | null;
+    tracks?: MbTrack[];
+};
+
+export type MbTrack = {
+    id?: string | null;
+    position: number;
+    number?: string | null;
+    title: string;
+    length?: number | null;
+    recording?: {
+        id?: string | null;
+        title?: string | null;
+        length?: number | null;
+    } | null;
 };
 
 export type MbBrowseReleases = {

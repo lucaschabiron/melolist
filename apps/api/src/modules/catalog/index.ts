@@ -1,18 +1,137 @@
 import { Elysia, t } from "elysia";
-import { db, artist, releaseGroup, release, eq, and, sql } from "@melolist/db";
+import {
+    db,
+    artist,
+    releaseGroup,
+    release,
+    releaseMedium,
+    releaseTrack,
+    eq,
+    and,
+    asc,
+    inArray,
+    sql,
+} from "@melolist/db";
 import {
     enqueueFetchArtist,
     enqueueFetchReleaseGroup,
     enqueueFetchReleases,
+    enqueueRefreshArtist,
+    enqueueRefreshReleases,
     getJobStatus,
 } from "@melolist/queue";
 import { authPlugin } from "../../lib/auth-plugin";
 import { searchCatalog, searchCatalogReleaseGroups } from "./search";
+
 const UUID_RE =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ARTIST_DISCOGRAPHY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function pollUrl(jobId: string): string {
     return `/catalog/jobs/${jobId}`;
+}
+
+type ReleaseRow = typeof release.$inferSelect;
+
+function isOlderThan(date: Date | null, ttlMs: number) {
+    if (!date) return true;
+    return Date.now() - date.getTime() > ttlMs;
+}
+
+function sortReleaseCandidates(a: ReleaseRow, b: ReleaseRow) {
+    const officialDelta =
+        Number(b.status === "official") - Number(a.status === "official");
+    if (officialDelta !== 0) return officialDelta;
+
+    const aDate = a.releaseDate ?? "9999-99-99";
+    const bDate = b.releaseDate ?? "9999-99-99";
+    const dateDelta = aDate.localeCompare(bDate);
+    if (dateDelta !== 0) return dateDelta;
+
+    return a.title.localeCompare(b.title);
+}
+
+async function selectedReleaseTracklist(releaseGroupId: string) {
+    const releases = await releaseEditions(releaseGroupId);
+
+    const candidates = releases.sort(sortReleaseCandidates);
+    if (candidates.length === 0) return null;
+
+    let fallback: {
+        release: ReleaseRow;
+        media: Array<
+            typeof releaseMedium.$inferSelect & {
+                tracks: (typeof releaseTrack.$inferSelect)[];
+            }
+        >;
+    } | null = null;
+
+    for (const candidate of candidates) {
+        const tracklist = await releaseTracklist(candidate);
+        const hasTracks = tracklist.media.some(
+            (medium) => medium.tracks.length > 0,
+        );
+        if (hasTracks) return tracklist;
+        fallback ??= tracklist;
+    }
+
+    return fallback;
+}
+
+async function releaseEditions(releaseGroupId: string) {
+    const releases = await db
+        .select()
+        .from(release)
+        .where(eq(release.releaseGroupId, releaseGroupId));
+
+    return releases.sort(sortReleaseCandidates);
+}
+
+async function releaseTracklist(selected: ReleaseRow) {
+    const mediaRows = await db
+        .select()
+        .from(releaseMedium)
+        .where(eq(releaseMedium.releaseId, selected.id))
+        .orderBy(asc(releaseMedium.position));
+
+    if (mediaRows.length === 0) {
+        return {
+            release: selected,
+            media: [],
+        };
+    }
+
+    const tracks = await db
+        .select()
+        .from(releaseTrack)
+        .where(
+            inArray(
+                releaseTrack.mediumId,
+                mediaRows.map((m) => m.id),
+            ),
+        )
+        .orderBy(asc(releaseTrack.position));
+
+    const tracksByMedium = new Map<string, typeof tracks>();
+    for (const track of tracks) {
+        const list = tracksByMedium.get(track.mediumId) ?? [];
+        list.push(track);
+        tracksByMedium.set(track.mediumId, list);
+    }
+
+    return {
+        release: selected,
+        media: mediaRows.map((medium) => ({
+            ...medium,
+            tracks: tracksByMedium.get(medium.id) ?? [],
+        })),
+    };
+}
+
+function tracklistHasTracks(
+    tracklist: Awaited<ReturnType<typeof selectedReleaseTracklist>>,
+) {
+    return tracklist?.media.some((medium) => medium.tracks.length > 0) ?? false;
 }
 
 export const catalogController = new Elysia({
@@ -69,6 +188,14 @@ export const catalogController = new Elysia({
                 });
             }
 
+            const discographyIsStale = isOlderThan(
+                artistRow.discographyFetchedAt,
+                ARTIST_DISCOGRAPHY_TTL_MS,
+            );
+            if (discographyIsStale) {
+                await enqueueRefreshArtist(mbid);
+            }
+
             const filters = [eq(releaseGroup.artistId, artistRow.id)];
             if (query.canonical === "true") {
                 filters.push(eq(releaseGroup.releaseType, "album"));
@@ -122,7 +249,13 @@ export const catalogController = new Elysia({
                 .from(releaseGroup)
                 .where(and(...filters));
 
-            return { artist: artistRow, releaseGroups: rgs };
+            return {
+                artist: artistRow,
+                releaseGroups: rgs,
+                discographyStatus: discographyIsStale
+                    ? "refreshing"
+                    : artistRow.discographySeedStatus,
+            };
         },
         {
             auth: true,
@@ -152,7 +285,42 @@ export const catalogController = new Elysia({
                     .from(artist)
                     .where(eq(artist.id, rg.artistId))
                     .limit(1);
-                return { releaseGroup: rg, artist: artistRow ?? null };
+
+                if (
+                    rg.releasesStatus !== "ready" &&
+                    rg.releasesStatus !== "seeding"
+                ) {
+                    await enqueueFetchReleases(mbid);
+                }
+
+                const editions =
+                    rg.releasesStatus === "ready"
+                        ? await releaseEditions(rg.id)
+                        : [];
+                let tracksStatus = rg.releasesStatus ?? "pending";
+                let tracklist =
+                    rg.releasesStatus === "ready"
+                        ? await selectedReleaseTracklist(rg.id)
+                        : null;
+
+                if (
+                    rg.releasesStatus === "ready" &&
+                    editions.length > 0 &&
+                    !tracklistHasTracks(tracklist)
+                ) {
+                    await enqueueRefreshReleases(mbid);
+                    tracksStatus = "seeding";
+                    tracklist = null;
+                }
+
+                return {
+                    releaseGroup: rg,
+                    artist: artistRow ?? null,
+                    tracksStatus,
+                    selectedRelease: tracklist?.release ?? null,
+                    media: tracklist?.media ?? [],
+                    editions,
+                };
             }
 
             const job = await enqueueFetchReleaseGroup(mbid);

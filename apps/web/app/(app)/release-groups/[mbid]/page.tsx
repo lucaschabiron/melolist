@@ -1,46 +1,12 @@
 import { cookies } from "next/headers";
 import { apiBaseUrl } from "../../../../lib/config";
-import AlbumView, { type AlbumHeaderData } from "./album-view";
-
-type ReleaseGroupRow = {
-    id: string;
-    musicbrainzId: string;
-    title: string;
-    primaryArtistCredit: string;
-    releaseType:
-        | "album"
-        | "ep"
-        | "single"
-        | "live"
-        | "compilation"
-        | "mixtape"
-        | "soundtrack"
-        | "other";
-    secondaryTypes: string[] | null;
-    firstReleaseDate: string | null;
-    coverArtUrl: string | null;
-};
-
-type ArtistRow = {
-    musicbrainzId: string;
-    name: string;
-} | null;
-
-type ReleaseGroupResponse = {
-    releaseGroup: ReleaseGroupRow;
-    artist: ArtistRow;
-};
+import AlbumView, { type ReleaseGroupResponse } from "./album-view";
 
 type ReleaseGroupDetailPageProps = {
     params: Promise<{
         mbid: string;
     }>;
 };
-
-function prettyReleaseType(value: ReleaseGroupRow["releaseType"]) {
-    if (value === "ep") return "EP";
-    return value.charAt(0).toUpperCase() + value.slice(1);
-}
 
 async function fetchReleaseGroup(
     mbid: string,
@@ -56,6 +22,7 @@ async function fetchReleaseGroup(
         },
     );
 
+    if (response.status === 202) return null;
     if (!response.ok) return null;
 
     const payload = (await response.json()) as
@@ -70,31 +37,7 @@ export default async function ReleaseGroupDetailPage({
     params,
 }: ReleaseGroupDetailPageProps) {
     const { mbid } = await params;
+    const data = await fetchReleaseGroup(mbid);
 
-    let header: AlbumHeaderData | null = null;
-    let pending = false;
-
-    try {
-        const data = await fetchReleaseGroup(mbid);
-        if (data) {
-            const { releaseGroup, artist } = data;
-            header = {
-                title: releaseGroup.title,
-                artist: releaseGroup.primaryArtistCredit,
-                artistMbid: artist?.musicbrainzId ?? null,
-                year: releaseGroup.firstReleaseDate
-                    ? Number(releaseGroup.firstReleaseDate.slice(0, 4))
-                    : null,
-                type: prettyReleaseType(releaseGroup.releaseType),
-                secondaryTypes: releaseGroup.secondaryTypes ?? [],
-                coverArtUrl: releaseGroup.coverArtUrl,
-            };
-        } else {
-            pending = true;
-        }
-    } catch {
-        pending = true;
-    }
-
-    return <AlbumView header={header} pending={pending} />;
+    return <AlbumView mbid={mbid} initialData={data} pending={!data} />;
 }
