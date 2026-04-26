@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { apiBaseUrl } from "../../../../lib/config";
-import { GenericCover, Icon, StatusGlyph } from "../../_components/primitives";
+import {
+    CoverArt,
+    GenericCover,
+    Icon,
+    StatusGlyph,
+} from "../../_components/primitives";
 import type { StatusId } from "../../release-groups/[mbid]/album-data";
 import {
     COMMUNITY_RATING,
@@ -38,6 +43,7 @@ export type DiscographyReleaseGroup = {
     releaseType: ReleaseTypeId;
     secondaryTypes: string[];
     firstReleaseDate: string | null;
+    coverArtUrl: string | null;
 };
 
 type ArtistRowDto = {
@@ -46,6 +52,7 @@ type ArtistRowDto = {
     sortName: string | null;
     disambiguation: string | null;
     country: string | null;
+    imageUrl: string | null;
     foundedYear: number | null;
     dissolvedYear: number | null;
 };
@@ -56,6 +63,7 @@ type ReleaseGroupRowDto = {
     releaseType: ReleaseTypeId;
     secondaryTypes: string[] | null;
     firstReleaseDate: string | null;
+    coverArtUrl: string | null;
 };
 
 type ArtistProfileResponse = { artist: ArtistRowDto } | { jobId: string };
@@ -136,6 +144,7 @@ function mapReleaseGroups(
         releaseType: rg.releaseType,
         secondaryTypes: rg.secondaryTypes ?? [],
         firstReleaseDate: rg.firstReleaseDate,
+        coverArtUrl: rg.coverArtUrl,
     }));
 }
 
@@ -192,9 +201,9 @@ function usePolling(
                                 name: payload.artist.name,
                                 disambiguation: payload.artist.disambiguation,
                                 country: payload.artist.country,
+                                imageUrl: payload.artist.imageUrl,
                                 foundedYear: payload.artist.foundedYear,
                                 dissolvedYear: payload.artist.dissolvedYear,
-                                imageUrl: null,
                             });
                         }
                     }
@@ -267,11 +276,7 @@ function ArtistImage({
     );
 }
 
-function StatusMixBar({
-    mix,
-}: {
-    mix: typeof PERSONAL_STATS.statusMix;
-}) {
+function StatusMixBar({ mix }: { mix: typeof PERSONAL_STATS.statusMix }) {
     const total = mix.reduce((sum, s) => sum + s.count, 0);
     const opacityFor = (id: StatusId): number => {
         switch (id) {
@@ -507,8 +512,6 @@ function DiscographyCard({
     size?: "md" | "sm";
 }) {
     const year = yearOf(item.firstReleaseDate);
-    const letter = item.title.trim()[0]?.toUpperCase() ?? "?";
-    const palette = paletteFor(item.mbid);
     const secondary = item.secondaryTypes.join(" · ");
     const typeLine = [prettyReleaseType(item.releaseType), secondary]
         .filter(Boolean)
@@ -519,11 +522,12 @@ function DiscographyCard({
             href={`/release-groups/${item.mbid}`}
             className="flex items-start gap-4 rounded-md px-3 py-3 -mx-3 no-underline text-paper transition-colors duration-120 hover:bg-paper/3"
         >
-            <GenericCover
+            <CoverArt
+                src={item.coverArtUrl}
+                title={item.title}
+                seed={item.mbid}
                 size={tileSize}
                 radius={6}
-                palette={palette}
-                label={letter}
             />
             <div className="min-w-0 flex-1 pt-0.5">
                 <div
@@ -776,12 +780,9 @@ export default function ArtistView({
         },
         [],
     );
-    const handleCanonical = useCallback(
-        (next: DiscographyReleaseGroup[]) => {
-            setCanonicalReleaseGroups(next);
-        },
-        [],
-    );
+    const handleCanonical = useCallback((next: DiscographyReleaseGroup[]) => {
+        setCanonicalReleaseGroups(next);
+    }, []);
 
     usePolling(
         mbid,

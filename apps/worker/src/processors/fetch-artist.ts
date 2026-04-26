@@ -9,6 +9,7 @@ import {
     browseReleaseGroupsByArtist,
     coverArtUrl,
     getArtist,
+    resolveArtistImageUrl,
 } from "@melolist/musicbrainz";
 import type { Job } from "bullmq";
 import { enqueueFetchReleases, type MusicbrainzJobData } from "@melolist/queue";
@@ -28,6 +29,7 @@ export async function processFetchArtist(
 
     try {
         const mb = await getArtist(mbid);
+        const imageUrl = await resolveArtistImageUrl(mb);
 
         const values = {
             musicbrainzId: mb.id,
@@ -35,6 +37,7 @@ export async function processFetchArtist(
             sortName: mb["sort-name"] ?? null,
             disambiguation: mb.disambiguation ?? null,
             country: mb.country ?? null,
+            imageUrl,
             foundedYear: parseYear(mb["life-span"]?.begin),
             dissolvedYear: parseYear(mb["life-span"]?.end),
             profileSeedStatus: "ready" as const,

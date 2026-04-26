@@ -6,12 +6,16 @@ export type ActivityKind =
     | "revisited"
     | "loved"
     | "listened"
-    | "owned";
+    | "owned"
+    | "unowned"
+    | "status_changed";
 
 export type ActivityEntry = {
     kind: ActivityKind;
     target: string;
     artist: string;
+    albumMbid?: string | null;
+    artistMbid?: string | null;
     rating?: number;
     date: string;
     snippet?: string;

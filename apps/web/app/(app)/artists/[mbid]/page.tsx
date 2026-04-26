@@ -11,6 +11,7 @@ type ArtistRow = {
     sortName: string | null;
     disambiguation: string | null;
     country: string | null;
+    imageUrl: string | null;
     foundedYear: number | null;
     dissolvedYear: number | null;
 };
@@ -32,7 +33,7 @@ function toProfile(row: ArtistRow): ArtistProfile {
         country: row.country,
         foundedYear: row.foundedYear,
         dissolvedYear: row.dissolvedYear,
-        imageUrl: null,
+        imageUrl: row.imageUrl,
     };
 }
 
@@ -43,6 +44,7 @@ function toDiscographyItem(row: ReleaseGroupRow): DiscographyReleaseGroup {
         releaseType: row.releaseType,
         secondaryTypes: row.secondaryTypes ?? [],
         firstReleaseDate: row.firstReleaseDate,
+        coverArtUrl: row.coverArtUrl,
     };
 }
 

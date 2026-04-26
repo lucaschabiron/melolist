@@ -11,12 +11,7 @@ import {
 } from "react";
 import { apiBaseUrl } from "../../../lib/config";
 import { authClient } from "../../lib/auth-client";
-import {
-    Avatar,
-    GenericCover,
-    Icon,
-    coverPalette,
-} from "../_components/primitives";
+import { Avatar, CoverArt, Icon } from "../_components/primitives";
 
 export type MeResponse = {
     id: string;
@@ -426,25 +421,13 @@ async function resolveReleaseGroupByMbid(
 }
 
 function CoverThumb({ item, size = 56 }: { item: ResolvedPin; size?: number }) {
-    if (item.coverArtUrl) {
-        return (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-                src={item.coverArtUrl}
-                alt={`${item.title} cover`}
-                width={size}
-                height={size}
-                className="rounded-sm object-cover shrink-0"
-                style={{ width: size, height: size }}
-            />
-        );
-    }
     return (
-        <GenericCover
+        <CoverArt
+            src={item.coverArtUrl}
+            title={item.title}
+            seed={item.mbid}
             size={size}
             radius={4}
-            palette={coverPalette(item.mbid)}
-            label={item.title.trim()[0]?.toUpperCase() ?? "?"}
         />
     );
 }

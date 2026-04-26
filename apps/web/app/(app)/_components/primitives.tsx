@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import type { StatusId } from "../release-groups/[mbid]/album-data";
 
 type IconName =
@@ -229,132 +229,6 @@ export function StatusGlyph({
     }
 }
 
-function Star({
-    fill,
-    size = 14,
-    stroke = 1,
-    uid,
-}: {
-    fill: 0 | 0.5 | 1;
-    size?: number;
-    stroke?: number;
-    uid: string;
-}) {
-    const path =
-        "M12 3.3 14.7 9.2 21.2 9.8 16.3 14.1 17.9 20.4 12 17.1 6.1 20.4 7.7 14.1 2.8 9.8 9.3 9.2z";
-    return (
-        <svg
-            width={size}
-            height={size}
-            viewBox="0 0 24 24"
-            style={{ display: "block" }}
-        >
-            <defs>
-                <clipPath id={uid}>
-                    <rect
-                        x="0"
-                        y="0"
-                        width={fill === 0.5 ? 12 : 24}
-                        height="24"
-                    />
-                </clipPath>
-            </defs>
-            <path
-                d={path}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={stroke}
-                strokeLinejoin="round"
-                opacity={fill === 0 ? 0.5 : 1}
-            />
-            {fill > 0 && (
-                <path
-                    d={path}
-                    fill="currentColor"
-                    stroke="currentColor"
-                    strokeWidth={stroke}
-                    strokeLinejoin="round"
-                    clipPath={fill === 0.5 ? `url(#${uid})` : undefined}
-                />
-            )}
-        </svg>
-    );
-}
-
-export function Stars({
-    value = 0,
-    max = 10,
-    size = 14,
-    onChange,
-    idPrefix,
-}: {
-    value?: number;
-    max?: number;
-    size?: number;
-    onChange?: (v: number) => void;
-    idPrefix: string;
-}) {
-    const [hoverVal, setHoverVal] = useState<number | null>(null);
-    const [pulseIdx, setPulseIdx] = useState<number>(-1);
-    const v = hoverVal != null ? hoverVal : value;
-    const starFill = (i: number): 0 | 0.5 | 1 => {
-        const whole = i + 1;
-        const half = i + 0.5;
-        if (v >= whole) return 1;
-        if (v >= half) return 0.5;
-        return 0;
-    };
-    return (
-        <div
-            className="inline-flex gap-0.5 text-paper"
-            style={{ cursor: onChange ? "pointer" : "default" }}
-        >
-            {Array.from({ length: max }).map((_, i) => (
-                <span
-                    key={i}
-                    onMouseMove={
-                        onChange
-                            ? (e) => {
-                                  const r =
-                                      e.currentTarget.getBoundingClientRect();
-                                  const left =
-                                      e.clientX - r.left < r.width / 2;
-                                  setHoverVal(i + (left ? 0.5 : 1));
-                              }
-                            : undefined
-                    }
-                    onMouseLeave={
-                        onChange ? () => setHoverVal(null) : undefined
-                    }
-                    onClick={
-                        onChange
-                            ? (e) => {
-                                  const r =
-                                      e.currentTarget.getBoundingClientRect();
-                                  const left =
-                                      e.clientX - r.left < r.width / 2;
-                                  const nv = i + (left ? 0.5 : 1);
-                                  onChange(nv);
-                                  setPulseIdx(i);
-                                  setTimeout(() => setPulseIdx(-1), 120);
-                              }
-                            : undefined
-                    }
-                    style={{
-                        display: "inline-flex",
-                        transform:
-                            pulseIdx === i ? "scale(1.15)" : "scale(1)",
-                        transition:
-                            "transform 100ms cubic-bezier(0.2,0.6,0.2,1)",
-                    }}
-                >
-                    <Star fill={starFill(i)} size={size} uid={`${idPrefix}-${i}`} />
-                </span>
-            ))}
-        </div>
-    );
-}
-
 export function RatingHistogram({
     buckets,
     width,
@@ -424,11 +298,7 @@ function avatarPalette(seed: string): [string, string] {
 
 function initialsFor(name: string | null | undefined) {
     if (!name) return "·";
-    const parts = name
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2);
+    const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
     if (parts.length === 0) return "·";
     return parts.map((p) => p[0]!.toUpperCase()).join("");
 }
@@ -541,5 +411,55 @@ export function GenericCover({
                 }}
             />
         </div>
+    );
+}
+
+export function CoverArt({
+    src,
+    title,
+    seed,
+    size,
+    radius = 8,
+    className = "",
+}: {
+    src: string | null | undefined;
+    title: string;
+    seed: string;
+    size?: number;
+    radius?: number;
+    className?: string;
+}) {
+    const [failed, setFailed] = useState(false);
+
+    useEffect(() => {
+        setFailed(false);
+    }, [src]);
+
+    if (!src || failed) {
+        return (
+            <GenericCover
+                size={size}
+                radius={radius}
+                palette={coverPalette(seed)}
+                label={title.trim()[0]?.toUpperCase() ?? "?"}
+                className={className}
+            />
+        );
+    }
+
+    const sizeStyle: CSSProperties =
+        size != null ? { width: size, height: size } : {};
+
+    return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+            src={src}
+            alt={`${title} cover`}
+            width={size}
+            height={size}
+            onError={() => setFailed(true)}
+            className={`shrink-0 object-cover ${className}`}
+            style={{ ...sizeStyle, borderRadius: radius }}
+        />
     );
 }

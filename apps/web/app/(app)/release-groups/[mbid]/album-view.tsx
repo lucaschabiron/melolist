@@ -3,9 +3,9 @@
 import { Fragment, useEffect, useId, useMemo, useState } from "react";
 import { apiBaseUrl } from "../../../../lib/config";
 import {
+    CoverArt,
     GenericCover,
     Icon,
-    Stars,
     StatusGlyph,
 } from "../../_components/primitives";
 import { STATUSES, type StatusId } from "./album-data";
@@ -97,6 +97,25 @@ type ArtistReleaseGroupsResponse = {
     releaseGroups: ArtistReleaseGroupRow[];
 };
 
+type UserAlbumState = {
+    libraryItem: {
+        id: string;
+        status: StatusId;
+        rating: number | null;
+        owned: boolean;
+        listenedAt: string | null;
+        updatedAt: string;
+    } | null;
+    mainReview: {
+        id: string;
+        rating: number;
+        body: string;
+        tags: string[];
+        createdAt: string;
+        updatedAt: string;
+    } | null;
+};
+
 type AlbumMetrics = {
     trackCount: number;
     runtimeMs: number;
@@ -177,6 +196,74 @@ function EmptyState({ children }: { children: React.ReactNode }) {
     );
 }
 
+function parseRatingDraft(value: string): number | null | undefined {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+
+    const rating = Number(trimmed);
+    if (!Number.isFinite(rating)) return undefined;
+
+    return Math.max(0, Math.min(10, Math.round(rating * 10) / 10));
+}
+
+function RatingNumberInput({
+    value,
+    onCommit,
+    required = false,
+    autoFocus = false,
+}: {
+    value: number | null;
+    onCommit: (value: number | null) => void;
+    required?: boolean;
+    autoFocus?: boolean;
+}) {
+    const [draft, setDraft] = useState(value === null ? "" : value.toFixed(1));
+
+    useEffect(() => {
+        setDraft(value === null ? "" : value.toFixed(1));
+    }, [value]);
+
+    function commit() {
+        const parsed = parseRatingDraft(draft);
+        if (parsed === undefined || (required && parsed === null)) {
+            setDraft(value === null ? "" : value.toFixed(1));
+            return;
+        }
+        setDraft(parsed === null ? "" : parsed.toFixed(1));
+        onCommit(parsed);
+    }
+
+    return (
+        <div className="flex items-center gap-2">
+            <input
+                autoFocus={autoFocus}
+                type="number"
+                min="0"
+                max="10"
+                step="0.1"
+                inputMode="decimal"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onBlur={commit}
+                onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                        event.currentTarget.blur();
+                    }
+                }}
+                placeholder="0.0"
+                className="w-24 rounded-sm border-[0.5px] border-(--hairline) bg-ink px-3 py-2 text-[18px] font-medium text-paper outline-none"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+            />
+            <span
+                className="text-caption text-steel"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+            >
+                /10
+            </span>
+        </div>
+    );
+}
+
 function AlbumCover({
     header,
     className = "w-full max-w-[320px] aspect-square",
@@ -186,25 +273,14 @@ function AlbumCover({
     className?: string;
     radius?: number;
 }) {
-    if (header?.coverArtUrl) {
-        return (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-                src={header.coverArtUrl}
-                alt={`${header.title} cover`}
-                className={`shrink-0 object-cover ${className}`}
-                style={{ borderRadius: radius }}
-            />
-        );
-    }
-
     if (header) {
         return (
-            <GenericCover
+            <CoverArt
+                src={header.coverArtUrl}
+                title={header.title}
+                seed={header.title}
                 className={className}
                 radius={radius}
-                palette={["#1a1a1a", "#2e2e2e", "#4a4a4a"]}
-                label={header.title.trim()[0]?.toUpperCase() ?? "?"}
             />
         );
     }
@@ -242,21 +318,21 @@ function AlbumHeader({
     status,
     setStatus,
     userRating,
-    setUserRating,
-    ratingOpen,
-    setRatingOpen,
     onWriteReview,
+    onLogRevisit,
+    onToggleOwned,
+    owned,
 }: {
     header: AlbumHeaderData | null;
     data: ReleaseGroupResponse | null;
     metrics: AlbumMetrics;
     status: StatusId;
     setStatus: (s: StatusId) => void;
-    userRating: number;
-    setUserRating: (v: number) => void;
-    ratingOpen: boolean;
-    setRatingOpen: (v: boolean) => void;
+    userRating: number | null;
     onWriteReview: () => void;
+    onLogRevisit: () => void;
+    onToggleOwned: () => void;
+    owned: boolean;
 }) {
     const [statusMenuOpen, setStatusMenuOpen] = useState(false);
     const currentStatus = STATUSES.find((s) => s.id === status)!;
@@ -450,66 +526,30 @@ function AlbumHeader({
                                     )}
                                 </div>
 
-                                <ActionBtn
-                                    active={ratingOpen}
-                                    onClick={() => setRatingOpen(!ratingOpen)}
-                                >
+                                <ActionBtn onClick={onWriteReview}>
                                     <Icon name="edit" size={14} />
                                     <span>
-                                        {userRating > 0
-                                            ? `Rated ${userRating}`
-                                            : "Rate"}
+                                        {userRating === null
+                                            ? "Rate / review"
+                                            : `Rated ${userRating.toFixed(1)}`}
                                     </span>
                                 </ActionBtn>
 
-                                <ActionBtn onClick={onWriteReview}>
-                                    <Icon name="edit" size={14} />
-                                    <span>Write review</span>
-                                </ActionBtn>
-
-                                <ActionBtn disabled>
+                                <ActionBtn onClick={onLogRevisit}>
                                     <Icon name="rotate" size={14} />
                                     <span>Log revisit</span>
                                 </ActionBtn>
 
-                                <ActionBtn disabled>
+                                <ActionBtn
+                                    active={owned}
+                                    onClick={onToggleOwned}
+                                >
                                     <Icon name="disc" size={14} />
-                                    <span>I own this</span>
+                                    <span>
+                                        {owned ? "Owned" : "I own this"}
+                                    </span>
                                 </ActionBtn>
                             </div>
-
-                            {ratingOpen && (
-                                <div className="mt-4 px-5 py-4 bg-surface rounded-sm flex items-center gap-5">
-                                    <Stars
-                                        value={userRating}
-                                        max={10}
-                                        size={22}
-                                        onChange={setUserRating}
-                                        idPrefix="inline-rate"
-                                    />
-                                    <div
-                                        className="text-[15px] text-paper min-w-[44px]"
-                                        style={{
-                                            fontVariantNumeric: "tabular-nums",
-                                        }}
-                                    >
-                                        {userRating > 0 ? (
-                                            `${userRating.toFixed(1)}/10`
-                                        ) : (
-                                            <span className="text-steel">
-                                                -- / 10
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex-1" />
-                                    <button
-                                        onClick={() => setRatingOpen(false)}
-                                        className="bg-transparent border-0 text-steel cursor-pointer text-caption"
-                                    >
-                                        Done
-                                    </button>
-                                </div>
-                            )}
                         </>
                     ) : (
                         <div className="flex flex-col gap-4">
@@ -559,9 +599,15 @@ function StatusMenuItem({
 function PersonalStrip({
     status,
     userRating,
+    owned,
+    reviewCount,
+    listenedAt,
 }: {
     status: StatusId;
-    userRating: number;
+    userRating: number | null;
+    owned: boolean;
+    reviewCount: number;
+    listenedAt: string | null;
 }) {
     const currentStatus = STATUSES.find((s) => s.id === status)!;
     const items: Array<{
@@ -574,12 +620,22 @@ function PersonalStrip({
             icon: <StatusGlyph kind={status} size={13} />,
         },
         {
-            label: userRating > 0 ? `${userRating.toFixed(1)}/10` : "Not rated",
+            label:
+                userRating !== null
+                    ? `${userRating.toFixed(1)}/10`
+                    : "Not rated",
             prefix: "Your rating",
         },
-        { label: "No listen date" },
-        { label: "No reviews" },
-        { label: "Not owned", icon: <Icon name="disc" size={13} /> },
+        {
+            label: listenedAt
+                ? `Listened ${new Date(listenedAt).toLocaleDateString()}`
+                : "No listen date",
+        },
+        { label: `${reviewCount} ${reviewCount === 1 ? "review" : "reviews"}` },
+        {
+            label: owned ? "Owned" : "Not owned",
+            icon: <Icon name="disc" size={13} />,
+        },
     ];
     return (
         <div className="mt-8 md:mt-12 bg-surface rounded-sm px-4 md:px-5 py-3 flex flex-wrap items-center gap-y-1 text-caption text-steel">
@@ -780,20 +836,98 @@ function Sidebar({ header }: { header: AlbumHeaderData | null }) {
     );
 }
 
-function YourReview({ onWriteReview }: { onWriteReview: () => void }) {
+function YourReview({
+    review,
+    onWriteReview,
+    onEditReview,
+    onDeleteReview,
+}: {
+    review: UserAlbumState["mainReview"];
+    onWriteReview: () => void;
+    onEditReview: () => void;
+    onDeleteReview: () => void;
+}) {
     return (
         <section>
             <h2 className="text-[20px] font-medium mb-5">Your review</h2>
             <article className="bg-surface rounded-md p-6 md:p-8">
-                <EmptyState>
-                    You have not reviewed this album yet.
-                    <button
-                        onClick={onWriteReview}
-                        className="mt-4 block px-4 py-[9px] rounded-sm bg-paper border-0 text-ink text-caption font-medium cursor-pointer"
-                    >
-                        Write review
-                    </button>
-                </EmptyState>
+                {review ? (
+                    <>
+                        <div className="flex items-start justify-between gap-6">
+                            <div>
+                                <div
+                                    className="text-[40px] font-medium text-paper"
+                                    style={{
+                                        lineHeight: 1,
+                                        letterSpacing: "-0.02em",
+                                        fontVariantNumeric: "tabular-nums",
+                                    }}
+                                >
+                                    {review.rating.toFixed(1)}
+                                </div>
+                            </div>
+                            <div
+                                className="text-caption text-steel text-right"
+                                style={{ fontVariantNumeric: "tabular-nums" }}
+                            >
+                                {new Date(
+                                    review.createdAt,
+                                ).toLocaleDateString()}
+                            </div>
+                        </div>
+                        {review.body.trim() && (
+                            <div
+                                className="font-serif text-[17px] text-paper mt-6 whitespace-pre-line"
+                                style={{ lineHeight: 1.6, maxWidth: 620 }}
+                            >
+                                {review.body}
+                            </div>
+                        )}
+                        {review.tags.length > 0 && (
+                            <div className="flex gap-2 mt-6 flex-wrap">
+                                {review.tags.map((tag) => (
+                                    <span
+                                        key={tag}
+                                        className="inline-block px-[10px] py-1 text-[12px] rounded-sm text-paper"
+                                        style={{ background: "#262626" }}
+                                    >
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                        <div className="mt-6 flex gap-4 text-caption">
+                            <button
+                                onClick={onEditReview}
+                                className="bg-transparent border-0 text-steel cursor-pointer p-0 border-b-[0.5px] border-(--hairline) pb-[1px] hover:text-paper"
+                            >
+                                Edit
+                            </button>
+                            <button
+                                onClick={onDeleteReview}
+                                className="bg-transparent border-0 text-steel cursor-pointer p-0 border-b-[0.5px] border-(--hairline) pb-[1px] hover:text-paper"
+                            >
+                                Delete
+                            </button>
+                            <button
+                                onClick={onWriteReview}
+                                className="bg-transparent border-0 text-steel cursor-pointer p-0 border-b-[0.5px] border-(--hairline) pb-[1px] hover:text-paper"
+                            >
+                                Write another review
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <EmptyState>
+                        You have not reviewed this album yet.
+                        <button
+                            onClick={onWriteReview}
+                            className="mt-4 block px-4 py-[9px] rounded-sm bg-paper border-0 text-ink text-caption font-medium cursor-pointer"
+                        >
+                            Write review
+                        </button>
+                    </EmptyState>
+                )}
             </article>
         </section>
     );
@@ -916,21 +1050,13 @@ function MoreFromCard({ item }: { item: ArtistReleaseGroupRow }) {
             href={`/release-groups/${item.musicbrainzId}`}
             className="w-[160px] shrink-0 no-underline text-paper"
         >
-            {item.coverArtUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                    src={item.coverArtUrl}
-                    alt={`${item.title} cover`}
-                    className="w-40 h-40 object-cover rounded-md"
-                />
-            ) : (
-                <GenericCover
-                    size={160}
-                    radius={8}
-                    palette={["#1a1a1a", "#2e2e2e", "#4a4a4a"]}
-                    label={item.title[0] ?? "R"}
-                />
-            )}
+            <CoverArt
+                src={item.coverArtUrl}
+                title={item.title}
+                seed={item.musicbrainzId}
+                size={160}
+                radius={8}
+            />
             <div className="mt-3 text-[14px] font-medium overflow-hidden text-ellipsis whitespace-nowrap">
                 {item.title}
             </div>
@@ -1081,11 +1207,27 @@ function ReviewDrawer({
     open,
     rating,
     setRating,
+    body,
+    setBody,
+    tags,
+    setTags,
+    listenedAt,
+    setListenedAt,
+    saving,
+    onSave,
     onClose,
 }: {
     open: boolean;
-    rating: number;
-    setRating: (rating: number) => void;
+    rating: number | null;
+    setRating: (rating: number | null) => void;
+    body: string;
+    setBody: (body: string) => void;
+    tags: string;
+    setTags: (tags: string) => void;
+    listenedAt: string;
+    setListenedAt: (listenedAt: string) => void;
+    saving: boolean;
+    onSave: () => void;
     onClose: () => void;
 }) {
     const dateId = useId();
@@ -1131,11 +1273,10 @@ function ReviewDrawer({
                         >
                             RATING
                         </div>
-                        <Stars
+                        <RatingNumberInput
                             value={rating}
-                            size={22}
-                            onChange={setRating}
-                            idPrefix="drawer-rating"
+                            onCommit={setRating}
+                            required
                         />
                     </div>
                     <div>
@@ -1148,7 +1289,11 @@ function ReviewDrawer({
                         </label>
                         <input
                             id={dateId}
-                            placeholder="Today"
+                            value={listenedAt}
+                            onChange={(event) =>
+                                setListenedAt(event.target.value)
+                            }
+                            type="date"
                             className="w-full px-3 py-[10px] bg-ink border-0 rounded-sm text-paper font-sans text-[14px] outline-none"
                         />
                     </div>
@@ -1163,6 +1308,8 @@ function ReviewDrawer({
                         <textarea
                             id={reviewId}
                             rows={12}
+                            value={body}
+                            onChange={(event) => setBody(event.target.value)}
                             placeholder="What did you hear?"
                             className="w-full p-[14px] bg-ink border-0 rounded-sm text-paper font-serif text-[17px] outline-none resize-y"
                             style={{ lineHeight: 1.6 }}
@@ -1178,6 +1325,8 @@ function ReviewDrawer({
                         </label>
                         <input
                             id={tagsId}
+                            value={tags}
+                            onChange={(event) => setTags(event.target.value)}
                             placeholder="Headphones, Grower"
                             className="w-full px-3 py-[10px] bg-ink border-0 rounded-sm text-paper font-sans text-[14px] outline-none"
                         />
@@ -1194,10 +1343,11 @@ function ReviewDrawer({
                         Cancel
                     </button>
                     <button
-                        onClick={onClose}
-                        className="px-4 py-[9px] rounded-sm bg-paper border-0 text-ink text-caption font-medium cursor-pointer"
+                        onClick={onSave}
+                        disabled={saving || rating === null}
+                        className="px-4 py-[9px] rounded-sm bg-paper border-0 text-ink text-caption font-medium cursor-pointer disabled:cursor-default disabled:opacity-50"
                     >
-                        Save draft
+                        {saving ? "Saving..." : "Save"}
                     </button>
                 </div>
             </div>
@@ -1221,6 +1371,96 @@ async function fetchAlbumData(
     return "jobId" in payload ? null : payload;
 }
 
+async function fetchUserAlbumState(mbid: string): Promise<UserAlbumState> {
+    const response = await fetch(
+        new URL(`users/me/library/release-groups/${mbid}`, apiBaseUrl),
+        { credentials: "include", cache: "no-store" },
+    );
+    if (!response.ok)
+        throw new Error(`user album state failed (${response.status})`);
+    return (await response.json()) as UserAlbumState;
+}
+
+async function saveLibraryState(
+    mbid: string,
+    body: {
+        status?: StatusId;
+        rating?: number | null;
+        owned?: boolean;
+        listenedAt?: string | null;
+        revisited?: boolean;
+    },
+) {
+    const response = await fetch(
+        new URL(`users/me/library/release-groups/${mbid}`, apiBaseUrl),
+        {
+            method: "PUT",
+            credentials: "include",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+        },
+    );
+    if (!response.ok)
+        throw new Error(`library save failed (${response.status})`);
+}
+
+async function postReview(
+    mbid: string,
+    body: {
+        rating: number;
+        body: string;
+        tags: string[];
+        listenedAt?: string;
+    },
+) {
+    const response = await fetch(
+        new URL(`users/me/reviews/release-groups/${mbid}`, apiBaseUrl),
+        {
+            method: "POST",
+            credentials: "include",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+        },
+    );
+    if (!response.ok)
+        throw new Error(`review save failed (${response.status})`);
+    return (await response.json()) as NonNullable<UserAlbumState["mainReview"]>;
+}
+
+async function updateReview(
+    id: string,
+    body: {
+        rating: number;
+        body: string;
+        tags: string[];
+    },
+) {
+    const response = await fetch(
+        new URL(`users/me/reviews/${id}`, apiBaseUrl),
+        {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+        },
+    );
+    if (!response.ok)
+        throw new Error(`review update failed (${response.status})`);
+    return (await response.json()) as NonNullable<UserAlbumState["mainReview"]>;
+}
+
+async function deleteReview(id: string) {
+    const response = await fetch(
+        new URL(`users/me/reviews/${id}`, apiBaseUrl),
+        {
+            method: "DELETE",
+            credentials: "include",
+        },
+    );
+    if (!response.ok)
+        throw new Error(`review delete failed (${response.status})`);
+}
+
 export default function AlbumView({
     mbid,
     initialData,
@@ -1233,9 +1473,20 @@ export default function AlbumView({
     const [data, setData] = useState<ReleaseGroupResponse | null>(initialData);
     const [isPending, setIsPending] = useState(pending);
     const [status, setStatus] = useState<StatusId>("backlog");
-    const [userRating, setUserRating] = useState<number>(0);
-    const [ratingOpen, setRatingOpen] = useState(false);
+    const [userRating, setUserRating] = useState<number | null>(null);
+    const [owned, setOwned] = useState(false);
+    const [listenedAt, setListenedAt] = useState<string | null>(null);
+    const [mainReview, setMainReview] =
+        useState<UserAlbumState["mainReview"]>(null);
     const [drawerOpen, setDrawerOpen] = useState(false);
+    const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+    const [reviewRating, setReviewRating] = useState<number | null>(null);
+    const [reviewBody, setReviewBody] = useState("");
+    const [reviewTags, setReviewTags] = useState("");
+    const [reviewDate, setReviewDate] = useState(() =>
+        new Date().toISOString().slice(0, 10),
+    );
+    const [reviewSaving, setReviewSaving] = useState(false);
 
     const header = useMemo(
         () => (data ? headerFromResponse(data) : null),
@@ -1273,13 +1524,128 @@ export default function AlbumView({
     }, [data?.tracksStatus, mbid]);
 
     useEffect(() => {
+        let cancelled = false;
+        void fetchUserAlbumState(mbid)
+            .then((state) => {
+                if (cancelled) return;
+                setStatus(state.libraryItem?.status ?? "backlog");
+                setUserRating(state.libraryItem?.rating ?? null);
+                setOwned(state.libraryItem?.owned ?? false);
+                setListenedAt(state.libraryItem?.listenedAt ?? null);
+                setMainReview(state.mainReview);
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+    }, [mbid]);
+
+    useEffect(() => {
         if (!drawerOpen) return;
+        setReviewRating(userRating);
         const prev = document.body.style.overflow;
         document.body.style.overflow = "hidden";
         return () => {
             document.body.style.overflow = prev;
         };
-    }, [drawerOpen]);
+    }, [drawerOpen, userRating]);
+
+    function openNewReview() {
+        setEditingReviewId(null);
+        setReviewRating(userRating);
+        setReviewBody("");
+        setReviewTags("");
+        setDrawerOpen(true);
+    }
+
+    function openEditReview() {
+        if (!mainReview) return;
+        setEditingReviewId(mainReview.id);
+        setReviewRating(mainReview.rating);
+        setReviewBody(mainReview.body);
+        setReviewTags(mainReview.tags.join(", "));
+        setDrawerOpen(true);
+    }
+
+    function persistStatus(nextStatus: StatusId) {
+        const previous = status;
+        setStatus(nextStatus);
+        void saveLibraryState(mbid, { status: nextStatus }).catch(() => {
+            setStatus(previous);
+        });
+    }
+
+    function persistOwned() {
+        const nextOwned = !owned;
+        setOwned(nextOwned);
+        void saveLibraryState(mbid, { owned: nextOwned }).catch(() => {
+            setOwned(!nextOwned);
+        });
+    }
+
+    function persistRevisit() {
+        const today = new Date().toISOString();
+        const previous = listenedAt;
+        setListenedAt(today);
+        void saveLibraryState(mbid, {
+            revisited: true,
+            listenedAt: today,
+            rating: userRating ?? undefined,
+        }).catch(() => {
+            setListenedAt(previous);
+        });
+    }
+
+    function saveReview() {
+        if (reviewSaving || reviewRating === null) return;
+        setReviewSaving(true);
+        const payload = {
+            rating: reviewRating,
+            body: reviewBody.trim(),
+            tags: reviewTags
+                .split(",")
+                .map((tag) => tag.trim())
+                .filter(Boolean),
+        };
+        const request = editingReviewId
+            ? updateReview(editingReviewId, payload)
+            : postReview(mbid, {
+                  ...payload,
+                  listenedAt: reviewDate || undefined,
+              });
+        void request
+            .then((review) => {
+                setMainReview(review);
+                setUserRating(review.rating);
+                setListenedAt(
+                    reviewDate ? new Date(reviewDate).toISOString() : null,
+                );
+                setReviewBody("");
+                setReviewTags("");
+                setEditingReviewId(null);
+                setDrawerOpen(false);
+            })
+            .catch(() => {})
+            .finally(() => setReviewSaving(false));
+    }
+
+    function removeMainReview() {
+        if (!mainReview) return;
+        const previousReview = mainReview;
+        const previousRating = userRating;
+        setMainReview(null);
+        setUserRating(null);
+        void deleteReview(mainReview.id)
+            .then(() => fetchUserAlbumState(mbid))
+            .then((state) => {
+                setMainReview(state.mainReview);
+                setUserRating(state.libraryItem?.rating ?? null);
+            })
+            .catch(() => {
+                setMainReview(previousReview);
+                setUserRating(previousRating);
+            });
+    }
 
     return (
         <>
@@ -1295,15 +1661,21 @@ export default function AlbumView({
                     data={data}
                     metrics={metrics}
                     status={status}
-                    setStatus={setStatus}
+                    setStatus={persistStatus}
                     userRating={userRating}
-                    setUserRating={setUserRating}
-                    ratingOpen={ratingOpen}
-                    setRatingOpen={setRatingOpen}
-                    onWriteReview={() => setDrawerOpen(true)}
+                    onWriteReview={openNewReview}
+                    onLogRevisit={persistRevisit}
+                    onToggleOwned={persistOwned}
+                    owned={owned}
                 />
 
-                <PersonalStrip status={status} userRating={userRating} />
+                <PersonalStrip
+                    status={status}
+                    userRating={userRating}
+                    owned={owned}
+                    listenedAt={listenedAt}
+                    reviewCount={mainReview ? 1 : 0}
+                />
 
                 <section className="mt-16 md:mt-24 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-10 lg:gap-16 items-start">
                     {data ? (
@@ -1319,7 +1691,12 @@ export default function AlbumView({
                 </section>
 
                 <div className="h-16 md:h-24" />
-                <YourReview onWriteReview={() => setDrawerOpen(true)} />
+                <YourReview
+                    review={mainReview}
+                    onWriteReview={openNewReview}
+                    onEditReview={openEditReview}
+                    onDeleteReview={removeMainReview}
+                />
 
                 <div className="h-16 md:h-24" />
                 <CommunityReviews />
@@ -1335,8 +1712,16 @@ export default function AlbumView({
 
             <ReviewDrawer
                 open={drawerOpen}
-                rating={userRating}
-                setRating={setUserRating}
+                rating={reviewRating}
+                setRating={setReviewRating}
+                body={reviewBody}
+                setBody={setReviewBody}
+                tags={reviewTags}
+                setTags={setReviewTags}
+                listenedAt={reviewDate}
+                setListenedAt={setReviewDate}
+                saving={reviewSaving}
+                onSave={saveReview}
                 onClose={() => setDrawerOpen(false)}
             />
         </>

@@ -11,6 +11,7 @@ import {
     useState,
 } from "react";
 import { apiBaseUrl } from "../../lib/config";
+import { CoverArt, GenericCover, coverPalette } from "./_components/primitives";
 import styles from "./search-overlay.module.css";
 
 type SearchResultSource = "local" | "musicbrainz";
@@ -95,24 +96,6 @@ function prettyReleaseType(value: SearchReleaseGroupResult["releaseType"]) {
         default:
             return value.charAt(0).toUpperCase() + value.slice(1);
     }
-}
-
-function ResultMeta({
-    source,
-    seeded,
-}: {
-    source: SearchResultSource;
-    seeded: boolean;
-}) {
-    return (
-        <span className="hidden shrink-0 whitespace-nowrap text-micro uppercase tracking-[0.16em] text-steel/70 sm:inline">
-            {source === "local"
-                ? seeded
-                    ? "Indexed"
-                    : "Local"
-                : "MusicBrainz"}
-        </span>
-    );
 }
 
 function EmptySection({ children }: { children: React.ReactNode }) {
@@ -393,42 +376,50 @@ export function SearchOverlay() {
                                     </EmptySection>
                                 ) : (
                                     <div className="space-y-2">
-                                        {visibleResults?.artists.map((artist) => (
-                                            <Link
-                                                key={artist.mbid}
-                                                href={`/artists/${artist.mbid}`}
-                                                className="flex min-w-0 items-start gap-3 rounded-lg px-3 py-2.5 transition-colors duration-120 hover:bg-paper/4"
-                                            >
-                                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-[0.5px] border-(--hairline) bg-paper/4 text-caption font-medium text-paper/80">
-                                                    {artist.name
-                                                        .slice(0, 2)
-                                                        .toUpperCase()}
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="truncate text-body font-medium text-paper">
-                                                        {artist.name}
+                                        {visibleResults?.artists.map(
+                                            (artist) => (
+                                                <Link
+                                                    key={artist.mbid}
+                                                    href={`/artists/${artist.mbid}`}
+                                                    className="flex min-w-0 items-start gap-3 rounded-lg px-3 py-2.5 transition-colors duration-120 hover:bg-paper/4"
+                                                >
+                                                    <GenericCover
+                                                        size={44}
+                                                        radius={6}
+                                                        palette={coverPalette(
+                                                            artist.mbid,
+                                                        )}
+                                                        label={
+                                                            artist.name
+                                                                .trim()[0]
+                                                                ?.toUpperCase() ??
+                                                            "?"
+                                                        }
+                                                    />
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="truncate text-body font-medium text-paper">
+                                                            {artist.name}
+                                                        </div>
+                                                        <div className="mt-0.5 flex min-w-0 items-center gap-2 text-caption text-steel">
+                                                            {artist.disambiguation ? (
+                                                                <span className="min-w-0 truncate">
+                                                                    {
+                                                                        artist.disambiguation
+                                                                    }
+                                                                </span>
+                                                            ) : null}
+                                                            {artist.country ? (
+                                                                <span className="shrink-0">
+                                                                    {
+                                                                        artist.country
+                                                                    }
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
                                                     </div>
-                                                    <div className="mt-0.5 flex min-w-0 items-center gap-2 text-caption text-steel">
-                                                        {artist.disambiguation ? (
-                                                            <span className="min-w-0 truncate">
-                                                                {
-                                                                    artist.disambiguation
-                                                                }
-                                                            </span>
-                                                        ) : null}
-                                                        {artist.country ? (
-                                                            <span className="shrink-0">
-                                                                {artist.country}
-                                                            </span>
-                                                        ) : null}
-                                                    </div>
-                                                </div>
-                                                <ResultMeta
-                                                    source={artist.source}
-                                                    seeded={artist.seeded}
-                                                />
-                                            </Link>
-                                        ))}
+                                                </Link>
+                                            ),
+                                        )}
                                     </div>
                                 )}
                             </section>
@@ -468,11 +459,17 @@ export function SearchOverlay() {
                                                     href={`/release-groups/${releaseGroup.mbid}`}
                                                     className="flex min-w-0 items-start gap-3 rounded-lg px-3 py-2.5 transition-colors duration-120 hover:bg-paper/4"
                                                 >
-                                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border-[0.5px] border-(--hairline) bg-paper/4 px-1 text-micro uppercase tracking-[0.12em] text-paper/75">
-                                                        {prettyReleaseType(
-                                                            releaseGroup.releaseType,
-                                                        )}
-                                                    </div>
+                                                    <CoverArt
+                                                        src={
+                                                            releaseGroup.coverArtUrl
+                                                        }
+                                                        title={
+                                                            releaseGroup.title
+                                                        }
+                                                        seed={releaseGroup.mbid}
+                                                        size={44}
+                                                        radius={6}
+                                                    />
                                                     <div className="min-w-0 flex-1">
                                                         <div className="truncate text-body font-medium text-paper">
                                                             {releaseGroup.title}
@@ -514,14 +511,6 @@ export function SearchOverlay() {
                                                             )}
                                                         </div>
                                                     </div>
-                                                    <ResultMeta
-                                                        source={
-                                                            releaseGroup.source
-                                                        }
-                                                        seeded={
-                                                            releaseGroup.seeded
-                                                        }
-                                                    />
                                                 </Link>
                                             ),
                                         )}

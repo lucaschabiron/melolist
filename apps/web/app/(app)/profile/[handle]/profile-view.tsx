@@ -2,18 +2,9 @@
 
 import Link from "next/link";
 import { Fragment, useState } from "react";
-import {
-    Avatar,
-    GenericCover,
-    Icon,
-    coverPalette,
-} from "../../_components/primitives";
-import {
-    MOCK_ACTIVITY,
-    MOCK_PROFILE_STATS,
-    type ActivityEntry,
-    type ActivityKind,
-} from "./profile-data";
+import { apiBaseUrl } from "../../../../lib/config";
+import { Avatar, CoverArt, Icon } from "../../_components/primitives";
+import { type ActivityEntry, type ActivityKind } from "./profile-data";
 import {
     AlbumListTab,
     ReviewsTab,
@@ -40,6 +31,54 @@ export type ProfileData = {
     isOwnProfile: boolean;
     privateProfile?: boolean;
     pinnedReleaseGroups: PinnedReleaseGroup[];
+};
+
+export type ProfileSummary = {
+    libraryItems: number;
+    albumsRated: number;
+    reviews: number;
+    distinctArtists: number;
+    averageRating: number | null;
+    owned: number;
+    statusBreakdown: Record<string, number>;
+};
+
+export type ProfileActivityItem = {
+    id: string;
+    type: ActivityKind;
+    rating: number | null;
+    status: string | null;
+    reviewId: string | null;
+    createdAt: string;
+    releaseGroup: {
+        mbid: string | null;
+        title: string;
+        primaryArtistCredit: string;
+        artistMbid: string | null;
+        year: number | null;
+        coverArtUrl: string | null;
+    };
+};
+
+export type ProfileLibraryItem = {
+    id: string;
+    rating: number | null;
+    status: string;
+    owned: boolean;
+    listenedAt: string | null;
+    updatedAt: string;
+    releaseGroup: ProfileActivityItem["releaseGroup"];
+};
+
+export type ProfileReviewItem = {
+    id: string;
+    rating: number;
+    body: string;
+    tags: string[];
+    isMain: boolean;
+    createdAt: string;
+    updatedAt: string;
+    releaseGroup: ProfileActivityItem["releaseGroup"];
 };
 
 const TABS = [
@@ -74,26 +113,13 @@ function CoverTile({
     size: number;
     rounded?: number;
 }) {
-    if (item.coverArtUrl) {
-        return (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-                src={item.coverArtUrl}
-                alt={`${item.title} cover`}
-                width={size}
-                height={size}
-                className="shrink-0 object-cover"
-                style={{ width: size, height: size, borderRadius: rounded }}
-            />
-        );
-    }
-    const letter = item.title.trim()[0]?.toUpperCase() ?? "?";
     return (
-        <GenericCover
+        <CoverArt
+            src={item.coverArtUrl}
+            title={item.title}
+            seed={item.mbid}
             size={size}
             radius={rounded}
-            palette={coverPalette(item.mbid)}
-            label={letter}
         />
     );
 }
@@ -101,16 +127,18 @@ function CoverTile({
 function Banner({ profile }: { profile: ProfileData }) {
     const pins = profile.pinnedReleaseGroups;
     const first = pins[0];
+    const [backgroundFailed, setBackgroundFailed] = useState(false);
 
     return (
         <section className="relative -mx-4 sm:-mx-6 lg:-mx-8 overflow-hidden border-b-[0.5px] border-(--hairline)">
             <div className="relative h-44 sm:h-56 md:h-64">
-                {first?.coverArtUrl ? (
+                {first?.coverArtUrl && !backgroundFailed ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                         src={first.coverArtUrl}
                         alt=""
                         aria-hidden="true"
+                        onError={() => setBackgroundFailed(true)}
                         className="absolute inset-0 w-full h-full object-cover scale-110"
                         style={{ filter: "blur(60px) saturate(85%)" }}
                     />
@@ -340,31 +368,31 @@ function TabNav({
     );
 }
 
-function StatsOverview() {
+function StatsOverview({ summary }: { summary: ProfileSummary | null }) {
     const items = [
         {
             label: "Albums rated",
-            value: MOCK_PROFILE_STATS.albumsRated.toLocaleString(),
+            value: summary?.albumsRated.toLocaleString() ?? "0",
         },
         {
             label: "Reviews",
-            value: MOCK_PROFILE_STATS.reviews.toLocaleString(),
+            value: summary?.reviews.toLocaleString() ?? "0",
         },
         {
             label: "Distinct artists",
-            value: MOCK_PROFILE_STATS.distinctArtists.toLocaleString(),
+            value: summary?.distinctArtists.toLocaleString() ?? "0",
         },
         {
-            label: "Hours listened",
-            value: MOCK_PROFILE_STATS.hoursListened.toLocaleString(),
+            label: "Library",
+            value: summary?.libraryItems.toLocaleString() ?? "0",
         },
         {
             label: "Avg rating",
-            value: MOCK_PROFILE_STATS.averageRating.toFixed(1),
+            value: summary?.averageRating?.toFixed(1) ?? "--",
         },
         {
             label: "Owned",
-            value: MOCK_PROFILE_STATS.owned.toLocaleString(),
+            value: summary?.owned.toLocaleString() ?? "0",
         },
     ];
     return (
@@ -375,10 +403,7 @@ function StatsOverview() {
             >
                 At a glance
             </h2>
-            <div
-                className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 rounded-md border-[0.5px] border-(--hairline) bg-surface overflow-hidden"
-                title="Mock data — not yet in DB"
-            >
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 rounded-md border-[0.5px] border-(--hairline) bg-surface overflow-hidden">
                 {items.map((item, i) => (
                     <div
                         key={item.label}
@@ -504,22 +529,12 @@ function PinnedAlbums({
 }
 
 function CoverTileFull({ item }: { item: PinnedReleaseGroup }) {
-    if (item.coverArtUrl) {
-        return (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-                src={item.coverArtUrl}
-                alt={`${item.title} cover`}
-                className="w-full h-full object-cover rounded-md"
-            />
-        );
-    }
-    const letter = item.title.trim()[0]?.toUpperCase() ?? "?";
     return (
-        <GenericCover
+        <CoverArt
+            src={item.coverArtUrl}
+            title={item.title}
+            seed={item.mbid}
             radius={8}
-            palette={coverPalette(item.mbid)}
-            label={letter}
             className="w-full h-full"
         />
     );
@@ -532,9 +547,35 @@ const ACTIVITY_VERB: Record<ActivityKind, string> = {
     loved: "loved",
     listened: "listened to",
     owned: "added to collection",
+    unowned: "removed from collection",
+    status_changed: "updated",
 };
 
-function ActivityItem({ entry }: { entry: ActivityEntry }) {
+async function deleteActivity(id: string) {
+    const response = await fetch(
+        new URL(`users/me/activity/${id}`, apiBaseUrl),
+        {
+            method: "DELETE",
+            credentials: "include",
+        },
+    );
+    if (!response.ok)
+        throw new Error(`activity delete failed (${response.status})`);
+}
+
+function ActivityItem({
+    entry,
+    canDelete,
+    onDelete,
+}: {
+    entry: ActivityEntry;
+    canDelete: boolean;
+    onDelete: () => void;
+}) {
+    const albumHref = entry.albumMbid
+        ? `/release-groups/${entry.albumMbid}`
+        : null;
+    const artistHref = entry.artistMbid ? `/artists/${entry.artistMbid}` : null;
     return (
         <article className="flex items-start gap-4 py-4 border-b-[0.5px] border-(--hairline) last:border-b-0">
             <div className="shrink-0 w-12 h-12 rounded-sm bg-surface flex items-center justify-center">
@@ -557,10 +598,29 @@ function ActivityItem({ entry }: { entry: ActivityEntry }) {
             <div className="min-w-0 flex-1">
                 <div className="text-caption text-steel">
                     <span>{ACTIVITY_VERB[entry.kind]}</span>{" "}
-                    <span className="text-paper font-medium">
-                        {entry.target}
-                    </span>{" "}
-                    <span>by {entry.artist}</span>
+                    {albumHref ? (
+                        <Link
+                            href={albumHref}
+                            className="text-paper font-medium no-underline hover:underline"
+                        >
+                            {entry.target}
+                        </Link>
+                    ) : (
+                        <span className="text-paper font-medium">
+                            {entry.target}
+                        </span>
+                    )}{" "}
+                    <span>by </span>
+                    {artistHref ? (
+                        <Link
+                            href={artistHref}
+                            className="text-steel no-underline hover:text-paper hover:underline"
+                        >
+                            {entry.artist}
+                        </Link>
+                    ) : (
+                        <span>{entry.artist}</span>
+                    )}
                     {entry.rating !== undefined && (
                         <>
                             {" · "}
@@ -590,11 +650,40 @@ function ActivityItem({ entry }: { entry: ActivityEntry }) {
             >
                 {entry.date}
             </div>
+            {canDelete && (
+                <button
+                    onClick={onDelete}
+                    aria-label="Remove activity"
+                    className="shrink-0 mt-0.5 bg-transparent border-0 text-steel cursor-pointer p-1 transition-colors duration-120 hover:text-paper"
+                >
+                    <Icon name="x" size={14} stroke={1.5} />
+                </button>
+            )}
         </article>
     );
 }
 
-function LatestActivity() {
+function toActivityEntry(item: ProfileActivityItem): ActivityEntry {
+    return {
+        kind: item.type,
+        target: item.releaseGroup.title,
+        artist: item.releaseGroup.primaryArtistCredit,
+        albumMbid: item.releaseGroup.mbid,
+        artistMbid: item.releaseGroup.artistMbid,
+        rating: item.rating ?? undefined,
+        date: new Date(item.createdAt).toLocaleDateString(),
+    };
+}
+
+function LatestActivity({
+    activity,
+    canDelete,
+    onDelete,
+}: {
+    activity: ProfileActivityItem[];
+    canDelete: boolean;
+    onDelete: (id: string) => void;
+}) {
     return (
         <section>
             <div className="flex items-baseline justify-between mb-5">
@@ -604,31 +693,51 @@ function LatestActivity() {
                 >
                     Latest activity
                 </h2>
-                <span
-                    className="text-caption text-steel"
-                    title="Mock data — not yet in DB"
-                >
-                    Last 2 weeks
-                </span>
+                <span className="text-caption text-steel">Recent</span>
             </div>
-            <div className="rounded-md bg-surface px-4 md:px-6">
-                {MOCK_ACTIVITY.map((entry, i) => (
-                    <ActivityItem key={i} entry={entry} />
-                ))}
-            </div>
+            {activity.length > 0 ? (
+                <div className="rounded-md bg-surface px-4 md:px-6">
+                    {activity.map((item) => (
+                        <ActivityItem
+                            key={item.id}
+                            entry={toActivityEntry(item)}
+                            canDelete={canDelete}
+                            onDelete={() => onDelete(item.id)}
+                        />
+                    ))}
+                </div>
+            ) : (
+                <div className="rounded-md border-[0.5px] border-(--hairline) bg-surface px-4 py-8 text-caption text-steel text-center">
+                    No activity yet.
+                </div>
+            )}
         </section>
     );
 }
 
-function OverviewTab({ profile }: { profile: ProfileData }) {
+function OverviewTab({
+    profile,
+    summary,
+    activity,
+    onDeleteActivity,
+}: {
+    profile: ProfileData;
+    summary: ProfileSummary | null;
+    activity: ProfileActivityItem[];
+    onDeleteActivity: (id: string) => void;
+}) {
     return (
         <div className="mt-10 flex flex-col gap-14 md:gap-20">
-            <StatsOverview />
+            <StatsOverview summary={summary} />
             <PinnedAlbums
                 pins={profile.pinnedReleaseGroups}
                 isOwnProfile={profile.isOwnProfile}
             />
-            <LatestActivity />
+            <LatestActivity
+                activity={activity}
+                canDelete={profile.isOwnProfile}
+                onDelete={onDeleteActivity}
+            />
         </div>
     );
 }
@@ -658,9 +767,28 @@ function PrivateProfile({ profile }: { profile: ProfileData }) {
     );
 }
 
-export default function ProfileView({ profile }: { profile: ProfileData }) {
+export default function ProfileView({
+    profile,
+    summary,
+    activity,
+    library,
+    reviews,
+}: {
+    profile: ProfileData;
+    summary: ProfileSummary | null;
+    activity: ProfileActivityItem[];
+    library: ProfileLibraryItem[];
+    reviews: ProfileReviewItem[];
+}) {
     const [tab, setTab] = useState<TabId>("overview");
     const [following, setFollowing] = useState(false);
+    const [activityItems, setActivityItems] = useState(activity);
+
+    function removeActivity(id: string) {
+        const previous = activityItems;
+        setActivityItems((items) => items.filter((item) => item.id !== id));
+        void deleteActivity(id).catch(() => setActivityItems(previous));
+    }
 
     if (profile.privateProfile) {
         return <PrivateProfile profile={profile} />;
@@ -676,11 +804,23 @@ export default function ProfileView({ profile }: { profile: ProfileData }) {
             />
             <TabNav tab={tab} onChange={setTab} />
 
-            {tab === "overview" && <OverviewTab profile={profile} />}
-            {tab === "albums" && <AlbumListTab />}
+            {tab === "overview" && (
+                <OverviewTab
+                    profile={profile}
+                    summary={summary}
+                    activity={activityItems}
+                    onDeleteActivity={removeActivity}
+                />
+            )}
+            {tab === "albums" && <AlbumListTab items={library} />}
             {tab === "tracks" && <TrackListTab />}
             {tab === "stats" && <StatsTab />}
-            {tab === "reviews" && <ReviewsTab />}
+            {tab === "reviews" && (
+                <ReviewsTab
+                    initialItems={reviews}
+                    canManage={profile.isOwnProfile}
+                />
+            )}
 
             <div className="h-20 md:h-32" />
         </main>

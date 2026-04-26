@@ -23,6 +23,14 @@ export type MbArtist = {
     country?: string | null;
     type?: string | null;
     "life-span"?: MbLifeSpan;
+    relations?: MbUrlRelation[];
+};
+
+export type MbUrlRelation = {
+    type?: string;
+    url?: {
+        resource?: string;
+    };
 };
 
 export type MbReleaseGroup = {

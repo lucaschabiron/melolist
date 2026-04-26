@@ -23,6 +23,7 @@ export const artist = pgTable("artist", {
     disambiguation: text("disambiguation"),
     country: varchar("country", { length: 2 }),
     bio: text("bio"),
+    imageUrl: text("image_url"),
     foundedYear: integer("founded_year"),
     dissolvedYear: integer("dissolved_year"),
     profileSeedStatus: seedStatusEnum("profile_seed_status")

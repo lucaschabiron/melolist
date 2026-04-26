@@ -49,7 +49,7 @@ async function mbFetch<T>(path: string): Promise<T> {
 }
 
 export function getArtist(mbid: string): Promise<MbArtist> {
-    return mbFetch<MbArtist>(`/artist/${mbid}`);
+    return mbFetch<MbArtist>(`/artist/${mbid}?inc=url-rels`);
 }
 
 export function getReleaseGroup(mbid: string): Promise<MbReleaseGroup> {

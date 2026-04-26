@@ -1,23 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
-import {
-    GenericCover,
-    StatusGlyph,
-    Stars,
-} from "../../_components/primitives";
+import { apiBaseUrl } from "../../../../lib/config";
+import { CoverArt, StatusGlyph } from "../../_components/primitives";
 import type { StatusId } from "../../release-groups/[mbid]/album-data";
 import {
-    MOCK_ALBUM_LIST,
     MOCK_BY_DECADE,
     MOCK_RATING_DISTRIBUTION,
-    MOCK_REVIEWS,
     MOCK_STATUS_BREAKDOWN,
     MOCK_TOP_ARTISTS,
     MOCK_TOP_GENRES,
     MOCK_TOP_TRACKS,
-    type AlbumListEntry,
 } from "./profile-data";
+import type { ProfileLibraryItem, ProfileReviewItem } from "./profile-view";
 
 type AlbumSortKey = "recent" | "rating" | "year" | "title";
 
@@ -29,17 +25,24 @@ const STATUS_FILTERS: Array<{ id: StatusId | "all"; label: string }> = [
     { id: "shelved", label: "Shelved" },
 ];
 
-function compareAlbums(a: AlbumListEntry, b: AlbumListEntry, key: AlbumSortKey) {
+function compareAlbums(
+    a: ProfileLibraryItem,
+    b: ProfileLibraryItem,
+    key: AlbumSortKey,
+) {
     switch (key) {
         case "rating":
-            return b.rating - a.rating;
+            return (b.rating ?? -1) - (a.rating ?? -1);
         case "year":
-            return b.year - a.year;
+            return (b.releaseGroup.year ?? 0) - (a.releaseGroup.year ?? 0);
         case "title":
-            return a.title.localeCompare(b.title);
+            return a.releaseGroup.title.localeCompare(b.releaseGroup.title);
         case "recent":
         default:
-            return 0;
+            return (
+                new Date(b.updatedAt).getTime() -
+                new Date(a.updatedAt).getTime()
+            );
     }
 }
 
@@ -55,20 +58,37 @@ function MockBadge() {
     );
 }
 
-export function AlbumListTab() {
+function LibraryCover({
+    item,
+    size = 40,
+}: {
+    item: ProfileLibraryItem;
+    size?: number;
+}) {
+    const releaseGroup = item.releaseGroup;
+    return (
+        <CoverArt
+            src={releaseGroup.coverArtUrl}
+            title={releaseGroup.title}
+            seed={releaseGroup.mbid ?? item.id}
+            size={size}
+            radius={4}
+        />
+    );
+}
+
+export function AlbumListTab({ items }: { items: ProfileLibraryItem[] }) {
     const [statusFilter, setStatusFilter] = useState<StatusId | "all">("all");
     const [sort, setSort] = useState<AlbumSortKey>("recent");
 
     const visible = useMemo(() => {
         const filtered =
             statusFilter === "all"
-                ? MOCK_ALBUM_LIST
-                : MOCK_ALBUM_LIST.filter((a) => a.status === statusFilter);
-        const sorted = [...filtered].sort((a, b) =>
-            compareAlbums(a, b, sort),
-        );
+                ? items
+                : items.filter((a) => a.status === statusFilter);
+        const sorted = [...filtered].sort((a, b) => compareAlbums(a, b, sort));
         return sorted;
-    }, [statusFilter, sort]);
+    }, [items, statusFilter, sort]);
 
     return (
         <div className="mt-10 flex flex-col gap-8">
@@ -84,9 +104,8 @@ export function AlbumListTab() {
                         className="text-caption text-steel"
                         style={{ fontVariantNumeric: "tabular-nums" }}
                     >
-                        {visible.length} of {MOCK_ALBUM_LIST.length}
+                        {visible.length} of {items.length}
                     </span>
-                    <MockBadge />
                 </div>
                 <div className="flex items-center gap-4 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto h-scroll">
                     {STATUS_FILTERS.map((f) => {
@@ -151,34 +170,61 @@ export function AlbumListTab() {
                                 "44px minmax(0, 1fr) 64px 80px 28px 100px",
                         }}
                     >
-                        <GenericCover
-                            size={40}
-                            radius={4}
-                            palette={album.palette}
-                            label={album.letter}
-                        />
+                        <LibraryCover item={album} />
                         <div className="min-w-0">
-                            <div className="truncate text-body font-medium text-paper">
-                                {album.title}
-                            </div>
-                            <div className="truncate text-caption text-steel">
-                                {album.artist}
-                            </div>
+                            {album.releaseGroup.mbid ? (
+                                <Link
+                                    href={`/release-groups/${album.releaseGroup.mbid}`}
+                                    className="block truncate text-body font-medium text-paper no-underline hover:underline"
+                                >
+                                    {album.releaseGroup.title}
+                                </Link>
+                            ) : (
+                                <div className="truncate text-body font-medium text-paper">
+                                    {album.releaseGroup.title}
+                                </div>
+                            )}
+                            {album.releaseGroup.artistMbid ? (
+                                <Link
+                                    href={`/artists/${album.releaseGroup.artistMbid}`}
+                                    className="block truncate text-caption text-steel no-underline hover:text-paper hover:underline"
+                                >
+                                    {album.releaseGroup.primaryArtistCredit}
+                                </Link>
+                            ) : (
+                                <div className="truncate text-caption text-steel">
+                                    {album.releaseGroup.primaryArtistCredit}
+                                </div>
+                            )}
                         </div>
                         <div className="text-right text-caption text-steel">
-                            {album.year}
+                            {album.releaseGroup.year ?? "--"}
                         </div>
                         <div className="text-right text-caption text-paper">
-                            {album.rating.toFixed(1)}
+                            {album.rating !== null
+                                ? album.rating.toFixed(1)
+                                : "--"}
                         </div>
                         <div className="flex justify-center text-paper">
-                            <StatusGlyph kind={album.status} size={13} />
+                            <StatusGlyph
+                                kind={album.status as StatusId}
+                                size={13}
+                            />
                         </div>
                         <div className="text-right text-caption text-steel truncate">
-                            {album.listenedOn}
+                            {album.listenedAt
+                                ? new Date(
+                                      album.listenedAt,
+                                  ).toLocaleDateString()
+                                : "--"}
                         </div>
                     </div>
                 ))}
+                {visible.length === 0 && (
+                    <div className="px-4 py-8 text-center text-caption text-steel">
+                        No albums yet.
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -547,15 +593,62 @@ const REVIEW_SORTS = [
     { id: "recent", label: "Most recent" },
     { id: "highest", label: "Highest rated" },
     { id: "longest", label: "Longest" },
-    { id: "helpful", label: "Most helpful" },
 ] as const;
 type ReviewSortKey = (typeof REVIEW_SORTS)[number]["id"];
 
-export function ReviewsTab() {
+function parseRatingDraft(value: string): number | null {
+    const rating = Number(value.trim());
+    if (!Number.isFinite(rating)) return null;
+    return Math.max(0, Math.min(10, Math.round(rating * 10) / 10));
+}
+
+async function updateReview(
+    id: string,
+    body: { rating: number; body: string; tags: string[] },
+) {
+    const response = await fetch(
+        new URL(`users/me/reviews/${id}`, apiBaseUrl),
+        {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+        },
+    );
+    if (!response.ok)
+        throw new Error(`review update failed (${response.status})`);
+    return (await response.json()) as ProfileReviewItem;
+}
+
+async function deleteReview(id: string) {
+    const response = await fetch(
+        new URL(`users/me/reviews/${id}`, apiBaseUrl),
+        {
+            method: "DELETE",
+            credentials: "include",
+        },
+    );
+    if (!response.ok)
+        throw new Error(`review delete failed (${response.status})`);
+}
+
+export function ReviewsTab({
+    initialItems,
+    canManage,
+}: {
+    initialItems: ProfileReviewItem[];
+    canManage: boolean;
+}) {
     const [sort, setSort] = useState<ReviewSortKey>("recent");
+    const [items, setItems] = useState(initialItems);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [draftRating, setDraftRating] = useState("");
+    const [draftBody, setDraftBody] = useState("");
+    const [draftTags, setDraftTags] = useState("");
+    const [savingId, setSavingId] = useState<string | null>(null);
 
     const sorted = useMemo(() => {
-        const list = [...MOCK_REVIEWS];
+        const list = [...items];
         switch (sort) {
             case "highest":
                 list.sort((a, b) => b.rating - a.rating);
@@ -563,15 +656,54 @@ export function ReviewsTab() {
             case "longest":
                 list.sort((a, b) => b.body.length - a.body.length);
                 break;
-            case "helpful":
-                list.sort((a, b) => b.helpful - a.helpful);
-                break;
             case "recent":
             default:
+                list.sort(
+                    (a, b) =>
+                        new Date(b.createdAt).getTime() -
+                        new Date(a.createdAt).getTime(),
+                );
                 break;
         }
         return list;
-    }, [sort]);
+    }, [items, sort]);
+
+    function startEdit(review: ProfileReviewItem) {
+        setEditingId(review.id);
+        setDraftRating(review.rating.toFixed(1));
+        setDraftBody(review.body);
+        setDraftTags(review.tags.join(", "));
+    }
+
+    function saveEdit(review: ProfileReviewItem) {
+        const rating = parseRatingDraft(draftRating);
+        if (rating === null || savingId) return;
+        setSavingId(review.id);
+        void updateReview(review.id, {
+            rating,
+            body: draftBody.trim(),
+            tags: draftTags
+                .split(",")
+                .map((tag) => tag.trim())
+                .filter(Boolean),
+        })
+            .then((updated) => {
+                setItems((current) =>
+                    current.map((item) =>
+                        item.id === updated.id ? updated : item,
+                    ),
+                );
+                setEditingId(null);
+            })
+            .catch(() => {})
+            .finally(() => setSavingId(null));
+    }
+
+    function removeReview(review: ProfileReviewItem) {
+        const previous = items;
+        setItems((current) => current.filter((item) => item.id !== review.id));
+        void deleteReview(review.id).catch(() => setItems(previous));
+    }
 
     return (
         <div className="mt-10 flex flex-col gap-8">
@@ -589,7 +721,6 @@ export function ReviewsTab() {
                     >
                         {sorted.length}
                     </span>
-                    <MockBadge />
                 </div>
                 <div className="flex items-center gap-4 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto h-scroll">
                     {REVIEW_SORTS.map((s) => {
@@ -620,18 +751,28 @@ export function ReviewsTab() {
                         className="rounded-md border-[0.5px] border-(--hairline) bg-surface p-5 md:p-6"
                     >
                         <div className="flex items-start gap-4">
-                            <GenericCover
+                            <CoverArt
+                                src={review.releaseGroup.coverArtUrl}
+                                title={review.releaseGroup.title}
+                                seed={review.releaseGroup.mbid ?? review.id}
                                 size={56}
                                 radius={6}
-                                palette={review.palette}
-                                label={review.letter}
                             />
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-baseline justify-between gap-4">
                                     <div className="min-w-0">
-                                        <div className="truncate text-body font-medium text-paper">
-                                            {review.target}
-                                        </div>
+                                        {review.releaseGroup.mbid ? (
+                                            <Link
+                                                href={`/release-groups/${review.releaseGroup.mbid}`}
+                                                className="block truncate text-body font-medium text-paper no-underline hover:underline"
+                                            >
+                                                {review.releaseGroup.title}
+                                            </Link>
+                                        ) : (
+                                            <div className="truncate text-body font-medium text-paper">
+                                                {review.releaseGroup.title}
+                                            </div>
+                                        )}
                                         <div
                                             className="truncate text-caption text-steel"
                                             style={{
@@ -639,7 +780,23 @@ export function ReviewsTab() {
                                                     "tabular-nums",
                                             }}
                                         >
-                                            {review.artist} · {review.year}
+                                            {review.releaseGroup.artistMbid ? (
+                                                <Link
+                                                    href={`/artists/${review.releaseGroup.artistMbid}`}
+                                                    className="text-steel no-underline hover:text-paper hover:underline"
+                                                >
+                                                    {
+                                                        review.releaseGroup
+                                                            .primaryArtistCredit
+                                                    }
+                                                </Link>
+                                            ) : (
+                                                review.releaseGroup
+                                                    .primaryArtistCredit
+                                            )}
+                                            {review.releaseGroup.year
+                                                ? ` · ${review.releaseGroup.year}`
+                                                : ""}
                                         </div>
                                     </div>
                                     <div
@@ -648,53 +805,133 @@ export function ReviewsTab() {
                                             fontVariantNumeric: "tabular-nums",
                                         }}
                                     >
-                                        {review.date}
+                                        {new Date(
+                                            review.createdAt,
+                                        ).toLocaleDateString()}
                                     </div>
                                 </div>
                                 <div className="mt-3 flex items-center gap-3">
-                                    <Stars
-                                        value={review.rating}
-                                        size={12}
-                                        idPrefix={`profile-review-${review.id}`}
-                                    />
                                     <span
                                         className="text-caption font-medium text-paper"
                                         style={{
                                             fontVariantNumeric: "tabular-nums",
                                         }}
                                     >
-                                        {review.rating.toFixed(1)}
+                                        {review.rating.toFixed(1)}/10
                                     </span>
+                                    {canManage && (
+                                        <div className="flex items-center gap-3 text-caption">
+                                            <button
+                                                onClick={() =>
+                                                    startEdit(review)
+                                                }
+                                                className="bg-transparent border-0 p-0 text-steel cursor-pointer hover:text-paper"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={() =>
+                                                    removeReview(review)
+                                                }
+                                                className="bg-transparent border-0 p-0 text-steel cursor-pointer hover:text-paper"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
-                        <p
-                            className="mt-4 font-serif text-[16px] text-paper whitespace-pre-line"
-                            style={{ lineHeight: 1.6 }}
-                        >
-                            {review.body}
-                        </p>
-                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex flex-wrap gap-2">
-                                {review.tags.map((tag) => (
-                                    <span
-                                        key={tag}
-                                        className="inline-block px-2.5 py-1 text-[12px] rounded-sm text-paper"
-                                        style={{ background: "#262626" }}
-                                    >
-                                        {tag}
+                        {editingId === review.id ? (
+                            <div className="mt-5 flex flex-col gap-4">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        value={draftRating}
+                                        onChange={(event) =>
+                                            setDraftRating(event.target.value)
+                                        }
+                                        type="number"
+                                        min="0"
+                                        max="10"
+                                        step="0.1"
+                                        className="w-24 rounded-sm border-[0.5px] border-(--hairline) bg-ink px-3 py-2 text-caption text-paper outline-none"
+                                    />
+                                    <span className="text-caption text-steel">
+                                        /10
                                     </span>
-                                ))}
+                                </div>
+                                <textarea
+                                    rows={7}
+                                    value={draftBody}
+                                    onChange={(event) =>
+                                        setDraftBody(event.target.value)
+                                    }
+                                    className="w-full rounded-sm border-0 bg-ink p-3 font-serif text-[16px] text-paper outline-none"
+                                    style={{ lineHeight: 1.6 }}
+                                />
+                                <input
+                                    value={draftTags}
+                                    onChange={(event) =>
+                                        setDraftTags(event.target.value)
+                                    }
+                                    placeholder="Tags"
+                                    className="w-full rounded-sm border-0 bg-ink px-3 py-2 text-caption text-paper outline-none"
+                                />
+                                <div className="flex justify-end gap-2">
+                                    <button
+                                        onClick={() => setEditingId(null)}
+                                        className="px-4 py-2 rounded-sm bg-transparent text-caption text-paper cursor-pointer"
+                                        style={{
+                                            border: "0.5px solid rgba(107,107,107,0.5)",
+                                        }}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={() => saveEdit(review)}
+                                        disabled={savingId === review.id}
+                                        className="px-4 py-2 rounded-sm bg-paper border-0 text-caption font-medium text-ink cursor-pointer disabled:opacity-50"
+                                    >
+                                        {savingId === review.id
+                                            ? "Saving..."
+                                            : "Save"}
+                                    </button>
+                                </div>
                             </div>
-                            <div
-                                className="text-[12px] text-steel"
-                                style={{ fontVariantNumeric: "tabular-nums" }}
-                            >
-                                {review.helpful} found this helpful
-                            </div>
-                        </div>
+                        ) : (
+                            <>
+                                {review.body.trim() && (
+                                    <p
+                                        className="mt-4 font-serif text-[16px] text-paper whitespace-pre-line"
+                                        style={{ lineHeight: 1.6 }}
+                                    >
+                                        {review.body}
+                                    </p>
+                                )}
+                                {review.tags.length > 0 && (
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                        {review.tags.map((tag) => (
+                                            <span
+                                                key={tag}
+                                                className="inline-block px-2.5 py-1 text-[12px] rounded-sm text-paper"
+                                                style={{
+                                                    background: "#262626",
+                                                }}
+                                            >
+                                                {tag}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </article>
                 ))}
+                {sorted.length === 0 && (
+                    <div className="rounded-md border-[0.5px] border-(--hairline) bg-surface px-4 py-8 text-caption text-steel text-center">
+                        No reviews yet.
+                    </div>
+                )}
             </div>
         </div>
     );
