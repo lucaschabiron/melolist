@@ -107,7 +107,36 @@ export function AlbumListTab({ items }: { items: ProfileLibraryItem[] }) {
                         {visible.length} of {items.length}
                     </span>
                 </div>
-                <div className="flex items-center gap-4 -mx-4 sm:mx-0 px-4 sm:px-0 overflow-x-auto h-scroll">
+                <div className="grid grid-cols-2 gap-2 md:hidden">
+                    <select
+                        value={statusFilter}
+                        onChange={(e) =>
+                            setStatusFilter(e.target.value as StatusId | "all")
+                        }
+                        aria-label="Album status"
+                        className="min-w-0 rounded-sm border-[0.5px] border-(--hairline) bg-surface px-3 py-2 text-caption text-paper outline-none"
+                    >
+                        {STATUS_FILTERS.map((f) => (
+                            <option key={f.id} value={f.id}>
+                                {f.label}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        value={sort}
+                        onChange={(e) =>
+                            setSort(e.target.value as AlbumSortKey)
+                        }
+                        aria-label="Album sort"
+                        className="min-w-0 rounded-sm border-[0.5px] border-(--hairline) bg-surface px-3 py-2 text-caption text-paper outline-none"
+                    >
+                        <option value="recent">Most recent</option>
+                        <option value="rating">Highest rated</option>
+                        <option value="year">Year</option>
+                        <option value="title">A to Z</option>
+                    </select>
+                </div>
+                <div className="hidden md:flex items-center gap-4">
                     {STATUS_FILTERS.map((f) => {
                         const active = statusFilter === f.id;
                         return (
@@ -126,13 +155,13 @@ export function AlbumListTab({ items }: { items: ProfileLibraryItem[] }) {
                             </button>
                         );
                     })}
-                    <div className="shrink-0 h-4 w-px bg-(--hairline) mx-1" />
+                    <div className="h-4 w-px bg-(--hairline) mx-1" />
                     <select
                         value={sort}
                         onChange={(e) =>
                             setSort(e.target.value as AlbumSortKey)
                         }
-                        className="shrink-0 bg-transparent text-caption text-paper outline-none cursor-pointer"
+                        className="bg-transparent text-caption text-paper outline-none cursor-pointer"
                     >
                         <option value="recent">Most recent</option>
                         <option value="rating">Highest rated</option>
@@ -147,12 +176,8 @@ export function AlbumListTab({ items }: { items: ProfileLibraryItem[] }) {
                 style={{ fontVariantNumeric: "tabular-nums" }}
             >
                 <div
-                    className="grid items-center gap-4 px-4 md:px-5 py-2.5 text-micro font-medium uppercase text-steel border-b-[0.5px] border-(--hairline)"
-                    style={{
-                        letterSpacing: "0.08em",
-                        gridTemplateColumns:
-                            "44px minmax(0, 1fr) 64px 80px 28px 100px",
-                    }}
+                    className="hidden md:grid md:grid-cols-[44px_minmax(0,1fr)_64px_80px_28px_100px] items-center gap-4 px-5 py-2.5 text-micro font-medium uppercase text-steel border-b-[0.5px] border-(--hairline)"
+                    style={{ letterSpacing: "0.08em" }}
                 >
                     <div></div>
                     <div>Title</div>
@@ -164,11 +189,7 @@ export function AlbumListTab({ items }: { items: ProfileLibraryItem[] }) {
                 {visible.map((album) => (
                     <div
                         key={album.id}
-                        className="grid items-center gap-4 px-4 md:px-5 py-3 border-b-[0.5px] border-(--hairline) last:border-b-0 hover:bg-paper/3 transition-colors duration-120"
-                        style={{
-                            gridTemplateColumns:
-                                "44px minmax(0, 1fr) 64px 80px 28px 100px",
-                        }}
+                        className="grid grid-cols-[44px_minmax(0,1fr)_48px] md:grid-cols-[44px_minmax(0,1fr)_64px_80px_28px_100px] items-center gap-3 md:gap-4 px-3 md:px-5 py-3 border-b-[0.5px] border-(--hairline) last:border-b-0 hover:bg-paper/3 transition-colors duration-120"
                     >
                         <LibraryCover item={album} />
                         <div className="min-w-0">
@@ -197,7 +218,7 @@ export function AlbumListTab({ items }: { items: ProfileLibraryItem[] }) {
                                 </div>
                             )}
                         </div>
-                        <div className="text-right text-caption text-steel">
+                        <div className="hidden md:block text-right text-caption text-steel">
                             {album.releaseGroup.year ?? "--"}
                         </div>
                         <div className="text-right text-caption text-paper">
@@ -205,13 +226,13 @@ export function AlbumListTab({ items }: { items: ProfileLibraryItem[] }) {
                                 ? album.rating.toFixed(1)
                                 : "--"}
                         </div>
-                        <div className="flex justify-center text-paper">
+                        <div className="hidden md:flex justify-center text-paper">
                             <StatusGlyph
                                 kind={album.status as StatusId}
                                 size={13}
                             />
                         </div>
-                        <div className="text-right text-caption text-steel truncate">
+                        <div className="hidden md:block text-right text-caption text-steel truncate">
                             {album.listenedAt
                                 ? new Date(
                                       album.listenedAt,

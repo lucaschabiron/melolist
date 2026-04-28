@@ -104,130 +104,6 @@ function formatJoinedAt(iso: string): string {
     });
 }
 
-function CoverTile({
-    item,
-    size,
-    rounded = 8,
-}: {
-    item: PinnedReleaseGroup;
-    size: number;
-    rounded?: number;
-}) {
-    return (
-        <CoverArt
-            src={item.coverArtUrl}
-            title={item.title}
-            seed={item.mbid}
-            size={size}
-            radius={rounded}
-        />
-    );
-}
-
-function Banner({ profile }: { profile: ProfileData }) {
-    const pins = profile.pinnedReleaseGroups;
-    const first = pins[0];
-    const [backgroundFailed, setBackgroundFailed] = useState(false);
-
-    return (
-        <section className="relative -mx-4 sm:-mx-6 lg:-mx-8 overflow-hidden border-b-[0.5px] border-(--hairline)">
-            <div className="relative h-44 sm:h-56 md:h-64">
-                {first?.coverArtUrl && !backgroundFailed ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                        src={first.coverArtUrl}
-                        alt=""
-                        aria-hidden="true"
-                        onError={() => setBackgroundFailed(true)}
-                        className="absolute inset-0 w-full h-full object-cover scale-110"
-                        style={{ filter: "blur(60px) saturate(85%)" }}
-                    />
-                ) : (
-                    <div
-                        className="absolute inset-0"
-                        style={{
-                            background:
-                                "radial-gradient(circle at 30% 40%, #1a1a1a 0%, #0d0d0d 70%)",
-                        }}
-                    />
-                )}
-
-                <div
-                    className="absolute inset-0"
-                    style={{
-                        background:
-                            "linear-gradient(to bottom, rgba(13,13,13,0.35) 0%, rgba(13,13,13,0.55) 55%, #0D0D0D 100%)",
-                    }}
-                />
-
-                {pins.length > 0 && (
-                    <div className="absolute inset-y-0 right-0 hidden sm:flex items-center pr-6 md:pr-10">
-                        <FannedCovers pins={pins} />
-                    </div>
-                )}
-
-                {pins.length > 0 && (
-                    <div className="absolute inset-y-0 right-0 flex items-center justify-end pr-4 sm:hidden">
-                        <MobilePins pins={pins} />
-                    </div>
-                )}
-            </div>
-        </section>
-    );
-}
-
-function FannedCovers({ pins }: { pins: PinnedReleaseGroup[] }) {
-    const visible = pins.slice(0, 4);
-    const rotations = [-8, -3, 2, 6];
-    const translates = [0, 24, 48, 72];
-    const yOffsets = [14, 4, 4, 12];
-
-    return (
-        <div className="relative h-[168px] w-[320px] md:h-[196px] md:w-[380px]">
-            {visible.map((pin, i) => {
-                const rot = rotations[i] ?? 0;
-                const tx = translates[i] ?? 0;
-                const ty = yOffsets[i] ?? 0;
-                return (
-                    <Link
-                        key={pin.mbid}
-                        href={`/release-groups/${pin.mbid}`}
-                        aria-label={`${pin.title} by ${pin.primaryArtistCredit}`}
-                        className="absolute top-1/2 left-0 transition-transform duration-200 ease-out hover:-translate-y-2"
-                        style={{
-                            transform: `translate(${tx}px, calc(-50% + ${ty}px)) rotate(${rot}deg)`,
-                            zIndex: i + 1,
-                            filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.5))",
-                        }}
-                    >
-                        <CoverTile item={pin} size={120} rounded={8} />
-                    </Link>
-                );
-            })}
-        </div>
-    );
-}
-
-function MobilePins({ pins }: { pins: PinnedReleaseGroup[] }) {
-    return (
-        <div className="flex items-center gap-1.5">
-            {pins.slice(0, 4).map((pin, i) => (
-                <Link
-                    key={pin.mbid}
-                    href={`/release-groups/${pin.mbid}`}
-                    className="block"
-                    style={{
-                        transform: `translateY(${i % 2 === 0 ? -4 : 4}px)`,
-                        filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.45))",
-                    }}
-                >
-                    <CoverTile item={pin} size={64} rounded={6} />
-                </Link>
-            ))}
-        </div>
-    );
-}
-
 function IdentityBar({
     profile,
     following,
@@ -242,10 +118,10 @@ function IdentityBar({
     metaParts.push(`Joined ${formatJoinedAt(profile.joinedAt)}`);
 
     return (
-        <section className="relative flex flex-col gap-6 pt-4 md:flex-row md:items-end md:gap-8">
+        <section className="relative flex items-start gap-4 pt-10 md:pt-14 md:items-end md:gap-8">
             <div className="flex flex-col sm:flex-row sm:items-end sm:gap-6 flex-1 min-w-0">
                 <div
-                    className="-mt-16 md:-mt-20 shrink-0"
+                    className="self-start shrink-0"
                     style={{
                         filter: "drop-shadow(0 12px 24px rgba(0,0,0,0.5))",
                     }}
@@ -305,7 +181,7 @@ function IdentityBar({
                 {profile.isOwnProfile ? (
                     <Link
                         href="/settings"
-                        className="inline-flex items-center gap-2 px-3.5 py-2.25 rounded-sm bg-transparent text-paper text-caption font-medium no-underline transition-[border-color] duration-120"
+                        className="inline-flex items-center gap-2 px-2.5 sm:px-3.5 py-2.25 rounded-sm bg-transparent text-paper text-caption font-medium no-underline transition-[border-color] duration-120"
                         style={{
                             border: "0.5px solid rgba(107,107,107,0.5)",
                         }}
@@ -344,14 +220,14 @@ function TabNav({
     onChange: (id: TabId) => void;
 }) {
     return (
-        <div className="mt-10 md:mt-14 -mx-4 sm:mx-0 px-4 sm:px-0 flex items-center gap-6 md:gap-8 overflow-x-auto h-scroll border-b-[0.5px] border-(--hairline)">
+        <div className="mt-10 md:mt-14 grid grid-cols-5 items-end gap-0 md:flex md:items-center md:gap-8 border-b-[0.5px] border-(--hairline)">
             {TABS.map((t) => {
                 const active = t.id === tab;
                 return (
                     <button
                         key={t.id}
                         onClick={() => onChange(t.id)}
-                        className="shrink-0 bg-transparent border-0 cursor-pointer text-caption font-medium py-3 transition-colors duration-120"
+                        className="min-w-0 bg-transparent border-0 cursor-pointer text-caption font-medium py-3 transition-colors duration-120"
                         style={{
                             color: active ? "#F7F7F7" : "#6B6B6B",
                             borderBottom: active
@@ -360,7 +236,14 @@ function TabNav({
                             marginBottom: "-1px",
                         }}
                     >
-                        {t.label}
+                        <span className="hidden sm:inline">{t.label}</span>
+                        <span className="sm:hidden">
+                            {t.id === "albums"
+                                ? "Albums"
+                                : t.id === "tracks"
+                                  ? "Tracks"
+                                  : t.label}
+                        </span>
                     </button>
                 );
             })}
@@ -728,11 +611,11 @@ function OverviewTab({
 }) {
     return (
         <div className="mt-10 flex flex-col gap-14 md:gap-20">
-            <StatsOverview summary={summary} />
             <PinnedAlbums
                 pins={profile.pinnedReleaseGroups}
                 isOwnProfile={profile.isOwnProfile}
             />
+            <StatsOverview summary={summary} />
             <LatestActivity
                 activity={activity}
                 canDelete={profile.isOwnProfile}
@@ -796,7 +679,6 @@ export default function ProfileView({
 
     return (
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-0">
-            <Banner profile={profile} />
             <IdentityBar
                 profile={profile}
                 following={following}
