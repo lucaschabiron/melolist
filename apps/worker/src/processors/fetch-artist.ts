@@ -2,6 +2,7 @@ import {
     artist,
     db,
     eq,
+    inArray,
     musicbrainzFetchLog,
     releaseGroup,
 } from "@melolist/db";
@@ -60,6 +61,25 @@ export async function processFetchArtist(
 
         const rgs = await browseReleaseGroupsByArtist(mbid);
         const releaseGroupMbidsToSeed: string[] = [];
+        const existingReleaseGroups =
+            rgs.length > 0
+                ? await db
+                      .select({
+                          musicbrainzId: releaseGroup.musicbrainzId,
+                          releasesStatus: releaseGroup.releasesStatus,
+                          releasesFetchedAt: releaseGroup.releasesFetchedAt,
+                      })
+                      .from(releaseGroup)
+                      .where(
+                          inArray(
+                              releaseGroup.musicbrainzId,
+                              rgs.map((rg) => rg.id),
+                          ),
+                      )
+                : [];
+        const existingByMbid = new Map(
+            existingReleaseGroups.map((rg) => [rg.musicbrainzId, rg]),
+        );
 
         for (const rg of rgs) {
             const mappedType = mapReleaseType(rg);
@@ -68,6 +88,13 @@ export async function processFetchArtist(
                 mappedType,
                 secondaryTypes,
             );
+            const existing = existingByMbid.get(rg.id);
+            const releasesStatus = shouldSeedReleases
+                ? existing?.releasesStatus === "ready" ||
+                  existing?.releasesStatus === "seeding"
+                    ? existing.releasesStatus
+                    : ("pending" as const)
+                : null;
 
             const rgValues = {
                 musicbrainzId: rg.id,
@@ -82,10 +109,11 @@ export async function processFetchArtist(
                 firstReleaseDate: parseDate(rg["first-release-date"]),
                 coverArtUrl: coverArtUrl(rg.id),
                 lastFetchedAt: new Date(),
-                releasesStatus: shouldSeedReleases
-                    ? ("pending" as const)
-                    : null,
-                releasesFetchedAt: null,
+                releasesStatus,
+                releasesFetchedAt:
+                    releasesStatus === "ready"
+                        ? (existing?.releasesFetchedAt ?? null)
+                        : null,
             };
 
             await db.insert(releaseGroup).values(rgValues).onConflictDoUpdate({
@@ -93,7 +121,7 @@ export async function processFetchArtist(
                 set: rgValues,
             });
 
-            if (shouldSeedReleases) {
+            if (releasesStatus === "pending") {
                 releaseGroupMbidsToSeed.push(rg.id);
             }
         }

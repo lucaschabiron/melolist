@@ -698,11 +698,8 @@ function PinnedAlbumsCard({ me }: { me: MeResponse }) {
         Array(MAX_PINNED).fill(null),
     );
     const [loading, setLoading] = useState(true);
-    const [savedIds, setSavedIds] = useState<string[]>(
-        me.pinnedReleaseGroupIds,
-    );
     const [state, setState] = useState<SaveState>("idle");
-    const [isPending, startTransition] = useTransition();
+    const requestSeq = useRef(0);
 
     useEffect(() => {
         let cancelled = false;
@@ -719,77 +716,78 @@ function PinnedAlbumsCard({ me }: { me: MeResponse }) {
             });
             setPins(next);
             setLoading(false);
+            setState("idle");
         })();
         return () => {
             cancelled = true;
         };
     }, [me.pinnedReleaseGroupIds]);
 
-    const currentIds = pins.filter(Boolean).map((p) => (p as ResolvedPin).mbid);
-    const dirty =
-        currentIds.length !== savedIds.length ||
-        currentIds.some((id, i) => id !== savedIds[i]);
-
-    const setAt = (idx: number, value: ResolvedPin | null) => {
-        setPins((prev) => {
-            const next = [...prev];
-            next[idx] = value;
-            return next;
+    const compactPins = (items: Array<ResolvedPin | null>) => {
+        const filled = items.filter((pin): pin is ResolvedPin => pin !== null);
+        const next: Array<ResolvedPin | null> = Array(MAX_PINNED).fill(null);
+        filled.forEach((pin, i) => {
+            next[i] = pin;
         });
+        return next;
     };
 
-    const compact = () => {
-        setPins((prev) => {
-            const filled = prev.filter(Boolean);
-            const next: Array<ResolvedPin | null> =
-                Array(MAX_PINNED).fill(null);
-            filled.forEach((p, i) => {
-                next[i] = p;
+    const pinIds = (items: Array<ResolvedPin | null>) =>
+        items
+            .filter((pin): pin is ResolvedPin => pin !== null)
+            .map((p) => p.mbid);
+
+    const commitPins = (
+        next: Array<ResolvedPin | null>,
+        previous: Array<ResolvedPin | null>,
+    ) => {
+        setPins(next);
+        setState("saving");
+        const requestId = requestSeq.current + 1;
+        requestSeq.current = requestId;
+        void patchMe({ pinnedReleaseGroupIds: pinIds(next) })
+            .then(() => {
+                if (requestId !== requestSeq.current) return;
+                setState("saved");
+                window.setTimeout(() => {
+                    if (requestId === requestSeq.current) setState("idle");
+                }, 1400);
+            })
+            .catch(() => {
+                if (requestId !== requestSeq.current) return;
+                setPins(previous);
+                setState("error");
             });
-            return next;
-        });
     };
 
     const moveUp = (idx: number) => {
         if (idx === 0) return;
-        setPins((prev) => {
-            const next = [...prev];
-            [next[idx - 1], next[idx]] = [next[idx]!, next[idx - 1]!];
-            return next;
-        });
+        const previous = pins;
+        const next = [...pins];
+        [next[idx - 1], next[idx]] = [next[idx]!, next[idx - 1]!];
+        commitPins(next, previous);
     };
 
     const moveDown = (idx: number) => {
         if (idx >= MAX_PINNED - 1) return;
-        setPins((prev) => {
-            const next = [...prev];
-            [next[idx + 1], next[idx]] = [next[idx]!, next[idx + 1]!];
-            return next;
-        });
+        const previous = pins;
+        const next = [...pins];
+        [next[idx + 1], next[idx]] = [next[idx]!, next[idx + 1]!];
+        commitPins(next, previous);
     };
 
     const onPick = (idx: number, hit: SearchHit) => {
         if (pins.some((p) => p?.mbid === hit.mbid)) return;
-        setAt(idx, hit);
-    };
-
-    const save = () => {
-        setState("saving");
-        startTransition(() => {
-            void patchMe({ pinnedReleaseGroupIds: currentIds })
-                .then(() => {
-                    setSavedIds(currentIds);
-                    setState("saved");
-                    setTimeout(() => setState("idle"), 1800);
-                })
-                .catch(() => setState("error"));
-        });
+        const previous = pins;
+        const next = [...pins];
+        next[idx] = hit;
+        commitPins(next, previous);
     };
 
     return (
         <SectionCard
             title="Pinned albums"
-            description={`Up to ${MAX_PINNED} albums shown in your profile banner. The first one becomes the banner backdrop.`}
+            description={`Up to ${MAX_PINNED} albums shown on your profile.`}
         >
             {loading ? (
                 <div className="rounded-sm border-[0.5px] border-(--hairline) bg-ink px-4 py-6 text-caption text-steel text-center">
@@ -810,8 +808,10 @@ function PinnedAlbumsCard({ me }: { me: MeResponse }) {
                             }
                             onPick={(hit) => onPick(i, hit)}
                             onClear={() => {
-                                setAt(i, null);
-                                setTimeout(compact, 0);
+                                const previous = pins;
+                                const next = [...pins];
+                                next[i] = null;
+                                commitPins(compactPins(next), previous);
                             }}
                             onMoveUp={() => moveUp(i)}
                             onMoveDown={() => moveDown(i)}
@@ -819,18 +819,18 @@ function PinnedAlbumsCard({ me }: { me: MeResponse }) {
                     ))}
                 </div>
             )}
-            <div className="mt-6 flex items-center justify-end gap-4">
+            <div className="mt-4 min-h-4 text-right">
+                {state === "saving" && (
+                    <span className="text-caption text-steel">Saving…</span>
+                )}
+                {state === "saved" && (
+                    <span className="text-caption text-steel">Saved</span>
+                )}
                 {state === "error" && (
                     <span className="text-caption text-steel">
-                        Couldn&apos;t save. Try again.
+                        Couldn&apos;t save. Reverted.
                     </span>
                 )}
-                <SaveButton
-                    state={isPending ? "saving" : state}
-                    dirty={dirty}
-                    onClick={save}
-                    label="Save pins"
-                />
             </div>
         </SectionCard>
     );
@@ -1313,14 +1313,14 @@ export default function SettingsView({ me }: { me: MeResponse }) {
                 Your preferences
             </h1>
 
-            <div className="mt-8 -mx-4 sm:mx-0 px-4 sm:px-0 flex items-center gap-6 md:gap-8 overflow-x-auto h-scroll border-b-[0.5px] border-(--hairline)">
+            <div className="mt-8 grid grid-cols-2 items-end gap-0 sm:flex sm:items-center sm:gap-8 border-b-[0.5px] border-(--hairline)">
                 {TABS.map((t) => {
                     const active = t.id === tab;
                     return (
                         <button
                             key={t.id}
                             onClick={() => setTab(t.id)}
-                            className="shrink-0 bg-transparent border-0 cursor-pointer text-caption font-medium py-3 transition-colors duration-120"
+                            className="min-w-0 bg-transparent border-0 cursor-pointer text-caption font-medium py-3 transition-colors duration-120"
                             style={{
                                 color: active ? "#F7F7F7" : "#6B6B6B",
                                 borderBottom: active

@@ -81,6 +81,18 @@ export type ProfileReviewItem = {
     releaseGroup: ProfileActivityItem["releaseGroup"];
 };
 
+export type ProfileTrackItem = {
+    id: string;
+    recordingMbid: string;
+    title: string;
+    number: string | null;
+    position: number;
+    lengthMs: number | null;
+    rating: number;
+    updatedAt: string;
+    releaseGroup: ProfileActivityItem["releaseGroup"];
+};
+
 const TABS = [
     { id: "overview", label: "Overview" },
     { id: "albums", label: "Album List" },
@@ -655,12 +667,14 @@ export default function ProfileView({
     summary,
     activity,
     library,
+    tracks,
     reviews,
 }: {
     profile: ProfileData;
     summary: ProfileSummary | null;
     activity: ProfileActivityItem[];
     library: ProfileLibraryItem[];
+    tracks: ProfileTrackItem[];
     reviews: ProfileReviewItem[];
 }) {
     const [tab, setTab] = useState<TabId>("overview");
@@ -695,7 +709,7 @@ export default function ProfileView({
                 />
             )}
             {tab === "albums" && <AlbumListTab items={library} />}
-            {tab === "tracks" && <TrackListTab />}
+            {tab === "tracks" && <TrackListTab items={tracks} />}
             {tab === "stats" && <StatsTab />}
             {tab === "reviews" && (
                 <ReviewsTab

@@ -11,9 +11,12 @@ import {
     MOCK_STATUS_BREAKDOWN,
     MOCK_TOP_ARTISTS,
     MOCK_TOP_GENRES,
-    MOCK_TOP_TRACKS,
 } from "./profile-data";
-import type { ProfileLibraryItem, ProfileReviewItem } from "./profile-view";
+import type {
+    ProfileLibraryItem,
+    ProfileReviewItem,
+    ProfileTrackItem,
+} from "./profile-view";
 
 type AlbumSortKey = "recent" | "rating" | "year" | "title";
 
@@ -256,8 +259,21 @@ const TRACK_VIEWS = [
     { id: "500", label: "Top 500", limit: 500 },
 ] as const;
 
-export function TrackListTab() {
+function formatDuration(lengthMs: number | null): string {
+    if (lengthMs === null) return "--:--";
+    const totalSeconds = Math.round(lengthMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+export function TrackListTab({ items }: { items: ProfileTrackItem[] }) {
     const [view, setView] = useState<(typeof TRACK_VIEWS)[number]["id"]>("100");
+    const visible = items.slice(
+        0,
+        TRACK_VIEWS.find((option) => option.id === view)?.limit ?? 100,
+    );
+
     return (
         <div className="mt-10 flex flex-col gap-8">
             <header className="flex flex-col gap-4 md:flex-row md:items-baseline md:justify-between md:gap-6">
@@ -272,10 +288,8 @@ export function TrackListTab() {
                         className="text-caption text-steel"
                         style={{ fontVariantNumeric: "tabular-nums" }}
                     >
-                        Showing {MOCK_TOP_TRACKS.length} of{" "}
-                        {view === "100" ? 100 : 500}
+                        Showing {visible.length} of {items.length}
                     </span>
-                    <MockBadge />
                 </div>
                 <div className="flex items-center gap-4">
                     {TRACK_VIEWS.map((v) => {
@@ -304,12 +318,8 @@ export function TrackListTab() {
                 style={{ fontVariantNumeric: "tabular-nums" }}
             >
                 <div
-                    className="grid items-center gap-4 px-4 md:px-5 py-2.5 text-micro font-medium uppercase text-steel border-b-[0.5px] border-(--hairline)"
-                    style={{
-                        letterSpacing: "0.08em",
-                        gridTemplateColumns:
-                            "32px minmax(0, 2fr) minmax(0, 1.5fr) 64px 56px 56px",
-                    }}
+                    className="hidden md:grid md:grid-cols-[32px_minmax(0,2fr)_minmax(0,1.5fr)_64px_56px_56px] items-center gap-4 px-5 py-2.5 text-micro font-medium uppercase text-steel border-b-[0.5px] border-(--hairline)"
+                    style={{ letterSpacing: "0.08em" }}
                 >
                     <div className="text-right">#</div>
                     <div>Track</div>
@@ -318,40 +328,44 @@ export function TrackListTab() {
                     <div className="text-right">Time</div>
                     <div className="text-right">Rating</div>
                 </div>
-                {MOCK_TOP_TRACKS.map((track) => (
+                {visible.map((track, index) => (
                     <div
-                        key={track.rank}
-                        className="grid items-center gap-4 px-4 md:px-5 py-3 border-b-[0.5px] border-(--hairline) last:border-b-0 hover:bg-paper/3 transition-colors duration-120"
-                        style={{
-                            gridTemplateColumns:
-                                "32px minmax(0, 2fr) minmax(0, 1.5fr) 64px 56px 56px",
-                        }}
+                        key={track.id}
+                        className="grid grid-cols-[32px_minmax(0,1fr)_48px] md:grid-cols-[32px_minmax(0,2fr)_minmax(0,1.5fr)_64px_56px_56px] items-center gap-3 md:gap-4 px-3 md:px-5 py-3 border-b-[0.5px] border-(--hairline) last:border-b-0 hover:bg-paper/3 transition-colors duration-120"
                     >
                         <div className="text-right text-caption text-steel">
-                            {track.rank}
+                            {index + 1}
                         </div>
                         <div className="min-w-0">
-                            <div className="truncate text-body font-medium text-paper">
+                            <Link
+                                href={`/tracks/${track.recordingMbid}`}
+                                className="block truncate text-body font-medium text-paper no-underline hover:underline"
+                            >
                                 {track.title}
-                            </div>
+                            </Link>
                             <div className="truncate text-caption text-steel">
-                                {track.artist}
+                                {track.releaseGroup.primaryArtistCredit}
                             </div>
                         </div>
-                        <div className="min-w-0 truncate text-caption text-steel">
-                            {track.album}
+                        <div className="hidden md:block min-w-0 truncate text-caption text-steel">
+                            {track.releaseGroup.title}
                         </div>
-                        <div className="text-right text-caption text-steel">
-                            {track.year}
+                        <div className="hidden md:block text-right text-caption text-steel">
+                            {track.releaseGroup.year ?? "--"}
                         </div>
-                        <div className="text-right text-caption text-steel">
-                            {track.runtime}
+                        <div className="hidden md:block text-right text-caption text-steel">
+                            {formatDuration(track.lengthMs)}
                         </div>
                         <div className="text-right text-caption text-paper">
                             {track.rating.toFixed(1)}
                         </div>
                     </div>
                 ))}
+                {visible.length === 0 && (
+                    <div className="px-4 py-8 text-center text-caption text-steel">
+                        No rated tracks yet.
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -618,7 +632,7 @@ const REVIEW_SORTS = [
 type ReviewSortKey = (typeof REVIEW_SORTS)[number]["id"];
 
 function parseRatingDraft(value: string): number | null {
-    const rating = Number(value.trim());
+    const rating = Number(value.trim().replace(",", "."));
     if (!Number.isFinite(rating)) return null;
     return Math.max(0, Math.min(10, Math.round(rating * 10) / 10));
 }
@@ -871,10 +885,8 @@ export function ReviewsTab({
                                         onChange={(event) =>
                                             setDraftRating(event.target.value)
                                         }
-                                        type="number"
-                                        min="0"
-                                        max="10"
-                                        step="0.1"
+                                        type="text"
+                                        inputMode="decimal"
                                         className="w-24 rounded-sm border-[0.5px] border-(--hairline) bg-ink px-3 py-2 text-caption text-paper outline-none"
                                     />
                                     <span className="text-caption text-steel">

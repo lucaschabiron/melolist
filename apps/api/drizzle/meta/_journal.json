@@ -1,76 +1,83 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1776617554257,
-      "tag": "0000_cynical_hulk",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1776724778094,
-      "tag": "0001_flowery_mariko_yashida",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1776727382627,
-      "tag": "0002_add_secondary_types",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1776788138444,
-      "tag": "0003_add_releases",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1776790843703,
-      "tag": "0004_cold_thor_girl",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1776802678000,
-      "tag": "0005_add_search_indexes",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1777100000000,
-      "tag": "0006_user_profile_fields",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1777160000000,
-      "tag": "0007_release_tracklists",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1777170000000,
-      "tag": "0008_user_library_reviews_activity",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1777180000000,
-      "tag": "0009_artist_image_url",
-      "breakpoints": true
-    }
-  ]
+    "version": "7",
+    "dialect": "postgresql",
+    "entries": [
+        {
+            "idx": 0,
+            "version": "7",
+            "when": 1776617554257,
+            "tag": "0000_cynical_hulk",
+            "breakpoints": true
+        },
+        {
+            "idx": 1,
+            "version": "7",
+            "when": 1776724778094,
+            "tag": "0001_flowery_mariko_yashida",
+            "breakpoints": true
+        },
+        {
+            "idx": 2,
+            "version": "7",
+            "when": 1776727382627,
+            "tag": "0002_add_secondary_types",
+            "breakpoints": true
+        },
+        {
+            "idx": 3,
+            "version": "7",
+            "when": 1776788138444,
+            "tag": "0003_add_releases",
+            "breakpoints": true
+        },
+        {
+            "idx": 4,
+            "version": "7",
+            "when": 1776790843703,
+            "tag": "0004_cold_thor_girl",
+            "breakpoints": true
+        },
+        {
+            "idx": 5,
+            "version": "7",
+            "when": 1776802678000,
+            "tag": "0005_add_search_indexes",
+            "breakpoints": true
+        },
+        {
+            "idx": 6,
+            "version": "7",
+            "when": 1777100000000,
+            "tag": "0006_user_profile_fields",
+            "breakpoints": true
+        },
+        {
+            "idx": 7,
+            "version": "7",
+            "when": 1777160000000,
+            "tag": "0007_release_tracklists",
+            "breakpoints": true
+        },
+        {
+            "idx": 8,
+            "version": "7",
+            "when": 1777170000000,
+            "tag": "0008_user_library_reviews_activity",
+            "breakpoints": true
+        },
+        {
+            "idx": 9,
+            "version": "7",
+            "when": 1777180000000,
+            "tag": "0009_artist_image_url",
+            "breakpoints": true
+        },
+        {
+            "idx": 10,
+            "version": "7",
+            "when": 1777331000000,
+            "tag": "0010_user_track_ratings",
+            "breakpoints": true
+        }
+    ]
 }

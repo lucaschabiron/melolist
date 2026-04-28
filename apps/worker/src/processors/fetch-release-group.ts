@@ -68,6 +68,20 @@ export async function processFetchReleaseGroup(
             mappedType,
             secondaryTypes,
         );
+        const [existing] = await db
+            .select({
+                releasesStatus: releaseGroup.releasesStatus,
+                releasesFetchedAt: releaseGroup.releasesFetchedAt,
+            })
+            .from(releaseGroup)
+            .where(eq(releaseGroup.musicbrainzId, mbid))
+            .limit(1);
+        const releasesStatus = shouldSeedReleases
+            ? existing?.releasesStatus === "ready" ||
+              existing?.releasesStatus === "seeding"
+                ? existing.releasesStatus
+                : ("pending" as const)
+            : null;
 
         const rgValues = {
             musicbrainzId: rg.id,
@@ -82,8 +96,11 @@ export async function processFetchReleaseGroup(
             firstReleaseDate: parseDate(rg["first-release-date"]),
             coverArtUrl: coverArtUrl(rg.id),
             lastFetchedAt: new Date(),
-            releasesStatus: shouldSeedReleases ? ("pending" as const) : null,
-            releasesFetchedAt: null,
+            releasesStatus,
+            releasesFetchedAt:
+                releasesStatus === "ready"
+                    ? (existing?.releasesFetchedAt ?? null)
+                    : null,
         };
 
         const [row] = await db
@@ -95,7 +112,7 @@ export async function processFetchReleaseGroup(
             })
             .returning({ id: releaseGroup.id });
 
-        if (shouldSeedReleases) {
+        if (releasesStatus === "pending") {
             await enqueueFetchReleases(rg.id);
         }
 

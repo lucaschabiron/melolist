@@ -194,10 +194,10 @@ export function Header() {
                             />
                         ) : (
                             <button
-                                onClick={handleSignOut}
+                                onClick={() => router.replace("/login")}
                                 className="shrink-0 text-caption text-steel hover:text-paper transition-colors duration-120"
                             >
-                                Sign out
+                                Sign in
                             </button>
                         )}
                     </div>

@@ -117,6 +117,34 @@ export const userReview = pgTable(
     ],
 );
 
+export const userTrackRating = pgTable(
+    "user_track_rating",
+    {
+        id: uuid("id").primaryKey().defaultRandom(),
+        userId: text("user_id")
+            .notNull()
+            .references(() => user.id, { onDelete: "cascade" }),
+        recordingMbid: uuid("recording_mbid").notNull(),
+        rating: integer("rating").notNull(),
+        createdAt: timestamp("created_at", { withTimezone: true })
+            .defaultNow()
+            .notNull(),
+        updatedAt: timestamp("updated_at", { withTimezone: true })
+            .defaultNow()
+            .$onUpdate(() => new Date())
+            .notNull(),
+    },
+    (table) => [
+        uniqueIndex("user_track_rating_user_recording_unique").on(
+            table.userId,
+            table.recordingMbid,
+        ),
+        index("user_track_rating_user_id_idx").on(table.userId),
+        index("user_track_rating_recording_mbid_idx").on(table.recordingMbid),
+        index("user_track_rating_updated_at_idx").on(table.updatedAt),
+    ],
+);
+
 export const userActivity = pgTable(
     "user_activity",
     {
@@ -178,6 +206,16 @@ export const userReviewRelations = relations(userReview, ({ one }) => ({
         references: [releaseGroup.id],
     }),
 }));
+
+export const userTrackRatingRelations = relations(
+    userTrackRating,
+    ({ one }) => ({
+        user: one(user, {
+            fields: [userTrackRating.userId],
+            references: [user.id],
+        }),
+    }),
+);
 
 export const userActivityRelations = relations(userActivity, ({ one }) => ({
     user: one(user, {

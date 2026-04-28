@@ -134,6 +134,26 @@ function tracklistHasTracks(
     return tracklist?.media.some((medium) => medium.tracks.length > 0) ?? false;
 }
 
+function serializeReleaseGroup(row: {
+    musicbrainzId: string | null;
+    title: string;
+    primaryArtistCredit: string;
+    firstReleaseDate: string | null;
+    coverArtUrl: string | null;
+    artistMbid?: string | null;
+}) {
+    return {
+        mbid: row.musicbrainzId,
+        title: row.title,
+        primaryArtistCredit: row.primaryArtistCredit,
+        artistMbid: row.artistMbid ?? null,
+        year: row.firstReleaseDate
+            ? Number(row.firstReleaseDate.slice(0, 4))
+            : null,
+        coverArtUrl: row.coverArtUrl,
+    };
+}
+
 export const catalogController = new Elysia({
     name: "catalog",
     prefix: "/catalog",
@@ -222,7 +242,11 @@ export const catalogController = new Elysia({
                                 rg.releasesStatus !== "seeding" &&
                                 rg.musicbrainzId !== null,
                         )
-                        .map((rg) => enqueueFetchReleases(rg.musicbrainzId!)),
+                        .map((rg) =>
+                            rg.releasesStatus === "pending"
+                                ? enqueueRefreshReleases(rg.musicbrainzId!)
+                                : enqueueFetchReleases(rg.musicbrainzId!),
+                        ),
                 );
 
                 if (pendingReleaseGroups.length > 0) {
@@ -264,6 +288,87 @@ export const catalogController = new Elysia({
                 canonical: t.Optional(t.String()),
                 type: t.Optional(t.String()),
             }),
+        },
+    )
+
+    .get(
+        "/recordings/:mbid",
+        async ({ params: { mbid }, status }) => {
+            if (!UUID_RE.test(mbid))
+                return status(400, { error: "invalid mbid" });
+
+            const rows = await db
+                .select({
+                    trackId: releaseTrack.id,
+                    recordingMbid: releaseTrack.recordingMbid,
+                    trackTitle: releaseTrack.title,
+                    trackNumber: releaseTrack.number,
+                    trackPosition: releaseTrack.position,
+                    lengthMs: releaseTrack.lengthMs,
+                    mediumPosition: releaseMedium.position,
+                    mediumTitle: releaseMedium.title,
+                    mediumFormat: releaseMedium.format,
+                    release: {
+                        mbid: release.musicbrainzId,
+                        title: release.title,
+                        status: release.status,
+                        releaseDate: release.releaseDate,
+                        country: release.country,
+                    },
+                    artistMbid: artist.musicbrainzId,
+                    releaseGroup,
+                })
+                .from(releaseTrack)
+                .innerJoin(
+                    releaseMedium,
+                    eq(releaseTrack.mediumId, releaseMedium.id),
+                )
+                .innerJoin(release, eq(releaseMedium.releaseId, release.id))
+                .innerJoin(
+                    releaseGroup,
+                    eq(release.releaseGroupId, releaseGroup.id),
+                )
+                .innerJoin(artist, eq(releaseGroup.artistId, artist.id))
+                .where(eq(releaseTrack.recordingMbid, mbid))
+                .orderBy(
+                    asc(release.releaseDate),
+                    asc(releaseMedium.position),
+                    asc(releaseTrack.position),
+                );
+
+            if (rows.length === 0)
+                return status(404, { error: "recording not found" });
+
+            const first = rows[0]!;
+            return {
+                recording: {
+                    mbid,
+                    title: first.trackTitle,
+                    primaryArtistCredit: first.releaseGroup.primaryArtistCredit,
+                    lengthMs: first.lengthMs,
+                },
+                appearances: rows.map((row) => ({
+                    trackId: row.trackId,
+                    title: row.trackTitle,
+                    number: row.trackNumber,
+                    position: row.trackPosition,
+                    lengthMs: row.lengthMs,
+                    medium: {
+                        position: row.mediumPosition,
+                        title: row.mediumTitle,
+                        format: row.mediumFormat,
+                    },
+                    release: row.release,
+                    releaseGroup: serializeReleaseGroup({
+                        ...row.releaseGroup,
+                        artistMbid: row.artistMbid,
+                    }),
+                })),
+            };
+        },
+        {
+            auth: true,
+            params: t.Object({ mbid: t.String() }),
         },
     )
 

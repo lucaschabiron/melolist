@@ -7,6 +7,7 @@ import ProfileView, {
     type ProfileLibraryItem,
     type ProfileReviewItem,
     type ProfileSummary,
+    type ProfileTrackItem,
 } from "./profile-view";
 
 async function fetchProfile(
@@ -81,6 +82,18 @@ async function fetchProfileReviews(handle: string, cookieHeader: string) {
     return "items" in payload ? payload.items : [];
 }
 
+async function fetchProfileTracks(handle: string, cookieHeader: string) {
+    const res = await apiFetch(
+        `users/${encodeURIComponent(handle)}/tracks?limit=500`,
+        cookieHeader,
+    );
+    if (!res.ok) return [];
+    const payload = (await res.json()) as
+        | { privateProfile: true; message: string }
+        | { privateProfile: false; items: ProfileTrackItem[] };
+    return "items" in payload ? payload.items : [];
+}
+
 export default async function ProfileDetailPage({
     params,
 }: {
@@ -95,13 +108,15 @@ export default async function ProfileDetailPage({
     const cookieStore = await cookies();
     const cookieHeader = cookieStore.toString();
 
-    const [result, summary, activity, library, reviews] = await Promise.all([
-        fetchProfile(handleLower, cookieHeader),
-        fetchProfileSummary(handleLower, cookieHeader),
-        fetchProfileActivity(handleLower, cookieHeader),
-        fetchProfileLibrary(handleLower, cookieHeader),
-        fetchProfileReviews(handleLower, cookieHeader),
-    ]);
+    const [result, summary, activity, library, tracks, reviews] =
+        await Promise.all([
+            fetchProfile(handleLower, cookieHeader),
+            fetchProfileSummary(handleLower, cookieHeader),
+            fetchProfileActivity(handleLower, cookieHeader),
+            fetchProfileLibrary(handleLower, cookieHeader),
+            fetchProfileTracks(handleLower, cookieHeader),
+            fetchProfileReviews(handleLower, cookieHeader),
+        ]);
     if (result === "unauthorized") redirect("/login");
     if (!result) notFound();
 
@@ -111,6 +126,7 @@ export default async function ProfileDetailPage({
             summary={summary}
             activity={activity}
             library={library}
+            tracks={tracks}
             reviews={reviews}
         />
     );

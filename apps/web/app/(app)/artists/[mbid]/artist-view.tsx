@@ -126,6 +126,8 @@ const OTHER_TAB_DEFINITIONS: Array<{
     },
 ];
 
+const OTHER_RELEASES_PAGE_SIZE = 12;
+
 function sortByYearThenTitle(items: DiscographyReleaseGroup[]) {
     return [...items].sort((a, b) => {
         const yearA = yearOf(a.firstReleaseDate) ?? 0;
@@ -613,6 +615,7 @@ function OtherReleases({
     pending: boolean;
 }) {
     const [tab, setTab] = useState<string>("all");
+    const [page, setPage] = useState(0);
 
     const nonCanonical = useMemo(() => {
         if (!items) return null;
@@ -628,12 +631,26 @@ function OtherReleases({
         return m;
     }, [nonCanonical]);
 
-    const visible = useMemo(() => {
+    const filtered = useMemo(() => {
         if (!nonCanonical) return [];
         const def = OTHER_TAB_DEFINITIONS.find((d) => d.id === tab);
         if (!def) return sortByYearThenTitle(nonCanonical);
         return sortByYearThenTitle(nonCanonical.filter(def.match));
     }, [nonCanonical, tab]);
+
+    const totalPages = Math.max(
+        1,
+        Math.ceil(filtered.length / OTHER_RELEASES_PAGE_SIZE),
+    );
+    const currentPage = Math.min(page, totalPages - 1);
+    const visible = filtered.slice(
+        currentPage * OTHER_RELEASES_PAGE_SIZE,
+        (currentPage + 1) * OTHER_RELEASES_PAGE_SIZE,
+    );
+
+    useEffect(() => {
+        setPage(0);
+    }, [tab]);
 
     if (!pending && nonCanonical && nonCanonical.length === 0) return null;
 
@@ -682,20 +699,54 @@ function OtherReleases({
                 <div className="rounded-sm border-[0.5px] border-(--hairline) bg-surface px-4 py-6 text-caption text-steel">
                     Loading releases…
                 </div>
-            ) : visible.length === 0 ? (
+            ) : filtered.length === 0 ? (
                 <div className="rounded-sm border-[0.5px] border-(--hairline) bg-surface px-4 py-6 text-caption text-steel">
                     Nothing in this category.
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-1">
-                    {visible.map((item) => (
-                        <DiscographyCard
-                            key={item.mbid}
-                            item={item}
-                            size="sm"
-                        />
-                    ))}
-                </div>
+                <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-1">
+                        {visible.map((item) => (
+                            <DiscographyCard
+                                key={item.mbid}
+                                item={item}
+                                size="sm"
+                            />
+                        ))}
+                    </div>
+                    {totalPages > 1 && (
+                        <div className="mt-8 flex items-center justify-between gap-4 border-t-[0.5px] border-(--hairline) pt-5">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setPage((value) => Math.max(0, value - 1))
+                                }
+                                disabled={currentPage === 0}
+                                className="bg-transparent border-0 p-0 text-caption font-medium text-steel transition-colors duration-120 enabled:cursor-pointer enabled:hover:text-paper disabled:opacity-40"
+                            >
+                                Previous
+                            </button>
+                            <div
+                                className="text-caption text-steel"
+                                style={{ fontVariantNumeric: "tabular-nums" }}
+                            >
+                                Page {currentPage + 1} of {totalPages}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setPage((value) =>
+                                        Math.min(totalPages - 1, value + 1),
+                                    )
+                                }
+                                disabled={currentPage >= totalPages - 1}
+                                className="bg-transparent border-0 p-0 text-caption font-medium text-steel transition-colors duration-120 enabled:cursor-pointer enabled:hover:text-paper disabled:opacity-40"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    )}
+                </>
             )}
         </section>
     );

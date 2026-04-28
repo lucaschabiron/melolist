@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useEffect, useId, useMemo, useState } from "react";
+import Link from "next/link";
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 import { apiBaseUrl } from "../../../../lib/config";
 import {
     CoverArt,
@@ -116,6 +117,14 @@ type UserAlbumState = {
     } | null;
 };
 
+type UserTrackRatingsResponse = {
+    ratings: Array<{
+        recordingMbid: string;
+        rating: number;
+        updatedAt: string;
+    }>;
+};
+
 type AlbumMetrics = {
     trackCount: number;
     runtimeMs: number;
@@ -200,7 +209,7 @@ function parseRatingDraft(value: string): number | null | undefined {
     const trimmed = value.trim();
     if (trimmed === "") return null;
 
-    const rating = Number(trimmed);
+    const rating = Number(trimmed.replace(",", "."));
     if (!Number.isFinite(rating)) return undefined;
 
     return Math.max(0, Math.min(10, Math.round(rating * 10) / 10));
@@ -237,10 +246,7 @@ function RatingNumberInput({
         <div className="flex items-center gap-2">
             <input
                 autoFocus={autoFocus}
-                type="number"
-                min="0"
-                max="10"
-                step="0.1"
+                type="text"
                 inputMode="decimal"
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
@@ -665,10 +671,97 @@ function PersonalStrip({
 }
 
 const TRACK_GRID =
-    "grid items-center gap-3 md:gap-4 grid-cols-[24px_1fr_44px_52px] md:grid-cols-[28px_1fr_120px_60px_56px]";
+    "grid items-center gap-3 md:gap-4 grid-cols-[24px_1fr_52px_52px] md:grid-cols-[28px_1fr_120px_60px_56px]";
 
-function TrackRow({ track }: { track: AlbumTrack }) {
+function TrackRatingInput({
+    value,
+    error,
+    disabled,
+    onCommit,
+}: {
+    value: number | null;
+    error: boolean;
+    disabled?: boolean;
+    onCommit: (rating: number | null) => void;
+}) {
+    const [draft, setDraft] = useState(value === null ? "" : value.toFixed(1));
+    const [focused, setFocused] = useState(false);
+    const cancelBlurCommit = useRef(false);
+
+    useEffect(() => {
+        if (!focused) setDraft(value === null ? "" : value.toFixed(1));
+    }, [focused, value]);
+
+    function revert() {
+        setDraft(value === null ? "" : value.toFixed(1));
+        setFocused(false);
+    }
+
+    function commit() {
+        if (cancelBlurCommit.current) {
+            cancelBlurCommit.current = false;
+            return;
+        }
+        const parsed = parseRatingDraft(draft);
+        if (parsed === undefined) {
+            revert();
+            return;
+        }
+        setDraft(parsed === null ? "" : parsed.toFixed(1));
+        setFocused(false);
+        if (parsed !== value) onCommit(parsed);
+    }
+
+    return (
+        <input
+            type="text"
+            inputMode="decimal"
+            value={draft}
+            disabled={disabled}
+            onFocus={() => setFocused(true)}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={commit}
+            onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                    event.currentTarget.blur();
+                }
+                if (event.key === "Escape") {
+                    event.preventDefault();
+                    cancelBlurCommit.current = true;
+                    revert();
+                    event.currentTarget.blur();
+                }
+            }}
+            placeholder="--"
+            aria-label="Your track rating"
+            title={
+                disabled
+                    ? "Recording identity unavailable"
+                    : error
+                      ? "Rating could not be saved"
+                      : undefined
+            }
+            className={`w-11 md:w-16 rounded-sm border-[0.5px] bg-transparent px-1.5 py-1 text-right text-caption text-paper outline-none transition-colors duration-120 placeholder:text-steel hover:border-(--hairline) focus:border-paper/30 focus:bg-ink ${
+                error ? "border-paper/50" : "border-transparent"
+            } disabled:cursor-default disabled:text-steel disabled:hover:border-transparent`}
+            style={{ fontVariantNumeric: "tabular-nums" }}
+        />
+    );
+}
+
+function TrackRow({
+    track,
+    userRating,
+    ratingError,
+    onRatingChange,
+}: {
+    track: AlbumTrack;
+    userRating: number | null;
+    ratingError: boolean;
+    onRatingChange: (recordingMbid: string, rating: number | null) => void;
+}) {
     const [hover, setHover] = useState(false);
+    const recordingMbid = track.recordingMbid;
     return (
         <div
             onMouseEnter={() => setHover(true)}
@@ -682,12 +775,34 @@ function TrackRow({ track }: { track: AlbumTrack }) {
                 {track.number ?? track.position}
             </div>
             <div className="text-[15px] text-paper min-w-0 truncate">
-                {track.title}
+                {recordingMbid ? (
+                    <Link
+                        href={`/tracks/${recordingMbid}`}
+                        className="text-paper no-underline hover:underline"
+                    >
+                        {track.title}
+                    </Link>
+                ) : (
+                    track.title
+                )}
             </div>
-            <div className="hidden md:block text-caption text-steel">--</div>
+            <div className="flex justify-end md:justify-start">
+                <TrackRatingInput
+                    value={userRating}
+                    error={ratingError}
+                    disabled={!recordingMbid}
+                    onCommit={(rating) => {
+                        if (recordingMbid)
+                            onRatingChange(recordingMbid, rating);
+                    }}
+                />
+            </div>
             <div
-                className="text-caption text-steel text-right"
+                className={`hidden md:block text-caption text-right ${
+                    ratingError ? "text-paper" : "text-steel"
+                }`}
                 style={{ fontVariantNumeric: "tabular-nums" }}
+                title={ratingError ? "Rating could not be saved" : undefined}
             >
                 --
             </div>
@@ -727,10 +842,16 @@ function Tracklist({
     status,
     media,
     metrics,
+    trackRatings,
+    ratingErrors,
+    onRatingChange,
 }: {
     status: ReleaseGroupResponse["tracksStatus"];
     media: AlbumMedium[];
     metrics: AlbumMetrics;
+    trackRatings: Record<string, number>;
+    ratingErrors: Set<string>;
+    onRatingChange: (recordingMbid: string, rating: number | null) => void;
 }) {
     if (status !== "ready") return <TracklistSkeleton />;
 
@@ -751,7 +872,7 @@ function Tracklist({
                 <div className="text-right">#</div>
                 <div>Track</div>
                 <div className="hidden md:block">Your rating</div>
-                <div className="text-right">Comm.</div>
+                <div className="hidden md:block text-right">Comm.</div>
                 <div className="text-right">Time</div>
             </div>
 
@@ -766,7 +887,22 @@ function Tracklist({
                             </div>
                         )}
                         {medium.tracks.map((track) => (
-                            <TrackRow key={track.id} track={track} />
+                            <TrackRow
+                                key={track.id}
+                                track={track}
+                                userRating={
+                                    track.recordingMbid
+                                        ? (trackRatings[track.recordingMbid] ??
+                                          null)
+                                        : null
+                                }
+                                ratingError={
+                                    track.recordingMbid
+                                        ? ratingErrors.has(track.recordingMbid)
+                                        : false
+                                }
+                                onRatingChange={onRatingChange}
+                            />
                         ))}
                     </div>
                 ))
@@ -1381,6 +1517,18 @@ async function fetchUserAlbumState(mbid: string): Promise<UserAlbumState> {
     return (await response.json()) as UserAlbumState;
 }
 
+async function fetchUserTrackRatings(
+    mbid: string,
+): Promise<UserTrackRatingsResponse> {
+    const response = await fetch(
+        new URL(`users/me/track-ratings/release-groups/${mbid}`, apiBaseUrl),
+        { credentials: "include", cache: "no-store" },
+    );
+    if (!response.ok)
+        throw new Error(`track ratings fetch failed (${response.status})`);
+    return (await response.json()) as UserTrackRatingsResponse;
+}
+
 async function saveLibraryState(
     mbid: string,
     body: {
@@ -1402,6 +1550,32 @@ async function saveLibraryState(
     );
     if (!response.ok)
         throw new Error(`library save failed (${response.status})`);
+}
+
+async function saveTrackRating(recordingMbid: string, rating: number) {
+    const response = await fetch(
+        new URL(`users/me/track-ratings/${recordingMbid}`, apiBaseUrl),
+        {
+            method: "PUT",
+            credentials: "include",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ rating }),
+        },
+    );
+    if (!response.ok)
+        throw new Error(`track rating save failed (${response.status})`);
+}
+
+async function deleteTrackRating(recordingMbid: string) {
+    const response = await fetch(
+        new URL(`users/me/track-ratings/${recordingMbid}`, apiBaseUrl),
+        {
+            method: "DELETE",
+            credentials: "include",
+        },
+    );
+    if (!response.ok)
+        throw new Error(`track rating delete failed (${response.status})`);
 }
 
 async function postReview(
@@ -1478,6 +1652,12 @@ export default function AlbumView({
     const [listenedAt, setListenedAt] = useState<string | null>(null);
     const [mainReview, setMainReview] =
         useState<UserAlbumState["mainReview"]>(null);
+    const [trackRatings, setTrackRatings] = useState<Record<string, number>>(
+        {},
+    );
+    const [trackRatingErrors, setTrackRatingErrors] = useState<Set<string>>(
+        () => new Set(),
+    );
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
     const [reviewRating, setReviewRating] = useState<number | null>(null);
@@ -1541,6 +1721,27 @@ export default function AlbumView({
     }, [mbid]);
 
     useEffect(() => {
+        let cancelled = false;
+        void fetchUserTrackRatings(mbid)
+            .then((payload) => {
+                if (cancelled) return;
+                setTrackRatings(
+                    Object.fromEntries(
+                        payload.ratings.map((item) => [
+                            item.recordingMbid,
+                            item.rating,
+                        ]),
+                    ),
+                );
+                setTrackRatingErrors(new Set());
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+    }, [mbid]);
+
+    useEffect(() => {
         if (!drawerOpen) return;
         setReviewRating(userRating);
         const prev = document.body.style.overflow;
@@ -1593,6 +1794,46 @@ export default function AlbumView({
             rating: userRating ?? undefined,
         }).catch(() => {
             setListenedAt(previous);
+        });
+    }
+
+    function persistTrackRating(
+        recordingMbid: string,
+        nextRating: number | null,
+    ) {
+        const previous = trackRatings[recordingMbid] ?? null;
+        setTrackRatingErrors((current) => {
+            const next = new Set(current);
+            next.delete(recordingMbid);
+            return next;
+        });
+        setTrackRatings((current) => {
+            const next = { ...current };
+            if (nextRating === null) {
+                delete next[recordingMbid];
+            } else {
+                next[recordingMbid] = nextRating;
+            }
+            return next;
+        });
+
+        const request =
+            nextRating === null
+                ? deleteTrackRating(recordingMbid)
+                : saveTrackRating(recordingMbid, nextRating);
+        void request.catch(() => {
+            setTrackRatings((current) => {
+                const next = { ...current };
+                if (previous === null) {
+                    delete next[recordingMbid];
+                } else {
+                    next[recordingMbid] = previous;
+                }
+                return next;
+            });
+            setTrackRatingErrors((current) =>
+                new Set(current).add(recordingMbid),
+            );
         });
     }
 
@@ -1683,6 +1924,9 @@ export default function AlbumView({
                             status={data.tracksStatus}
                             media={data.media}
                             metrics={metrics}
+                            trackRatings={trackRatings}
+                            ratingErrors={trackRatingErrors}
+                            onRatingChange={persistTrackRating}
                         />
                     ) : (
                         <TracklistSkeleton />

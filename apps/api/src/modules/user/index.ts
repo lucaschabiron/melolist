@@ -8,12 +8,16 @@ import {
     eq,
     inArray,
     or,
+    release,
     releaseGroup,
+    releaseMedium,
+    releaseTrack,
     sql,
     userActivity,
     userLibraryItem,
     userProfileTable,
     userReview,
+    userTrackRating,
     user as userTable,
 } from "@melolist/db";
 import {
@@ -116,6 +120,18 @@ async function releaseGroupByMbid(mbid: string) {
         .where(eq(releaseGroup.musicbrainzId, mbid))
         .limit(1);
     return row ?? null;
+}
+
+function serializeTrackRating(row: {
+    recordingMbid: string;
+    rating: number;
+    updatedAt: Date;
+}) {
+    return {
+        recordingMbid: row.recordingMbid,
+        rating: ratingFromDb(row.rating)!,
+        updatedAt: row.updatedAt.toISOString(),
+    };
 }
 
 async function visibleActivityRows(
@@ -583,6 +599,113 @@ export const userController = new Elysia({
     )
 
     .get(
+        "/:handle/tracks",
+        async ({ params: { handle }, query, user: currentUser, status }) => {
+            const target = await visibleUserByHandle(handle, currentUser.id);
+            if (!target) return status(404, { error: "user not found" });
+            if (target.privateProfile) {
+                return {
+                    privateProfile: true,
+                    message: "Private profile",
+                };
+            }
+
+            const { limit, offset } = parseLimitOffset(query);
+            const ratingRows = await db
+                .select({
+                    id: userTrackRating.id,
+                    recordingMbid: userTrackRating.recordingMbid,
+                    rating: userTrackRating.rating,
+                    updatedAt: userTrackRating.updatedAt,
+                })
+                .from(userTrackRating)
+                .where(eq(userTrackRating.userId, target.user.id))
+                .orderBy(
+                    desc(userTrackRating.rating),
+                    desc(userTrackRating.updatedAt),
+                )
+                .limit(limit)
+                .offset(offset);
+
+            const recordingMbids = ratingRows.map((row) => row.recordingMbid);
+            const appearanceRows =
+                recordingMbids.length > 0
+                    ? await db
+                          .select({
+                              recordingMbid: releaseTrack.recordingMbid,
+                              trackTitle: releaseTrack.title,
+                              trackNumber: releaseTrack.number,
+                              trackPosition: releaseTrack.position,
+                              lengthMs: releaseTrack.lengthMs,
+                              artistMbid: artist.musicbrainzId,
+                              releaseGroup,
+                          })
+                          .from(releaseTrack)
+                          .innerJoin(
+                              releaseMedium,
+                              eq(releaseTrack.mediumId, releaseMedium.id),
+                          )
+                          .innerJoin(
+                              release,
+                              eq(releaseMedium.releaseId, release.id),
+                          )
+                          .innerJoin(
+                              releaseGroup,
+                              eq(release.releaseGroupId, releaseGroup.id),
+                          )
+                          .innerJoin(
+                              artist,
+                              eq(releaseGroup.artistId, artist.id),
+                          )
+                          .where(
+                              inArray(
+                                  releaseTrack.recordingMbid,
+                                  recordingMbids,
+                              ),
+                          )
+                    : [];
+
+            const appearancesByRecording = new Map(
+                appearanceRows.map((row) => [row.recordingMbid, row]),
+            );
+
+            return {
+                privateProfile: false,
+                items: ratingRows.flatMap((row) => {
+                    const appearance = appearancesByRecording.get(
+                        row.recordingMbid,
+                    );
+                    if (!appearance) return [];
+                    return {
+                        id: row.id,
+                        recordingMbid: row.recordingMbid,
+                        title: appearance.trackTitle,
+                        number: appearance.trackNumber,
+                        position: appearance.trackPosition,
+                        lengthMs: appearance.lengthMs,
+                        rating: ratingFromDb(row.rating)!,
+                        updatedAt: row.updatedAt.toISOString(),
+                        releaseGroup: serializeReleaseGroup({
+                            ...appearance.releaseGroup,
+                            artistMbid: appearance.artistMbid,
+                        }),
+                    };
+                }),
+                limit,
+                offset,
+            };
+        },
+        {
+            auth: true,
+            params: t.Object({ handle: t.String() }),
+            query: t.Object({
+                limit: t.Optional(t.String()),
+                offset: t.Optional(t.String()),
+            }),
+        },
+    )
+
+    .get(
         "/:handle/activity",
         async ({ params: { handle }, query, user: currentUser, status }) => {
             const target = await visibleUserByHandle(handle, currentUser.id);
@@ -759,6 +882,143 @@ export const userController = new Elysia({
         {
             auth: true,
             params: t.Object({ mbid: t.String() }),
+        },
+    )
+
+    .get(
+        "/me/track-ratings/release-groups/:mbid",
+        async ({ params: { mbid }, user, status }) => {
+            const rg = await releaseGroupByMbid(mbid);
+            if (!rg) return status(404, { error: "release group not found" });
+
+            const recordingRows = await db
+                .select({ recordingMbid: releaseTrack.recordingMbid })
+                .from(releaseTrack)
+                .innerJoin(
+                    releaseMedium,
+                    eq(releaseTrack.mediumId, releaseMedium.id),
+                )
+                .innerJoin(release, eq(releaseMedium.releaseId, release.id))
+                .where(
+                    and(
+                        eq(release.releaseGroupId, rg.id),
+                        sql`${releaseTrack.recordingMbid} IS NOT NULL`,
+                    ),
+                );
+
+            const recordingMbids = [
+                ...new Set(
+                    recordingRows.flatMap((row) =>
+                        row.recordingMbid ? [row.recordingMbid] : [],
+                    ),
+                ),
+            ];
+
+            const rows =
+                recordingMbids.length > 0
+                    ? await db
+                          .select({
+                              recordingMbid: userTrackRating.recordingMbid,
+                              rating: userTrackRating.rating,
+                              updatedAt: userTrackRating.updatedAt,
+                          })
+                          .from(userTrackRating)
+                          .where(
+                              and(
+                                  eq(userTrackRating.userId, user.id),
+                                  inArray(
+                                      userTrackRating.recordingMbid,
+                                      recordingMbids,
+                                  ),
+                              ),
+                          )
+                    : [];
+
+            return { ratings: rows.map(serializeTrackRating) };
+        },
+        {
+            auth: true,
+            params: t.Object({ mbid: t.String() }),
+        },
+    )
+
+    .put(
+        "/me/track-ratings/:recordingMbid",
+        async ({ params: { recordingMbid }, body, user, status }) => {
+            if (!UUID_RE.test(recordingMbid)) {
+                return status(400, { error: "invalid recording mbid" });
+            }
+
+            const [track] = await db
+                .select({
+                    recordingMbid: releaseTrack.recordingMbid,
+                })
+                .from(releaseTrack)
+                .where(eq(releaseTrack.recordingMbid, recordingMbid))
+                .limit(1);
+            if (!track) return status(404, { error: "recording not found" });
+
+            const rating = ratingToDb(body.rating);
+            if (rating === null) {
+                return status(400, {
+                    error: "rating must be between 0.0 and 10.0",
+                });
+            }
+
+            const now = new Date();
+            const [trackRating] = await db
+                .insert(userTrackRating)
+                .values({
+                    userId: user.id,
+                    recordingMbid,
+                    rating,
+                    updatedAt: now,
+                })
+                .onConflictDoUpdate({
+                    target: [
+                        userTrackRating.userId,
+                        userTrackRating.recordingMbid,
+                    ],
+                    set: { rating, updatedAt: now },
+                })
+                .returning({
+                    recordingMbid: userTrackRating.recordingMbid,
+                    rating: userTrackRating.rating,
+                    updatedAt: userTrackRating.updatedAt,
+                });
+
+            return {
+                ok: true,
+                trackRating: serializeTrackRating(trackRating!),
+            };
+        },
+        {
+            auth: true,
+            params: t.Object({ recordingMbid: t.String() }),
+            body: t.Object({ rating: t.Number() }),
+        },
+    )
+
+    .delete(
+        "/me/track-ratings/:recordingMbid",
+        async ({ params: { recordingMbid }, user, status }) => {
+            if (!UUID_RE.test(recordingMbid))
+                return status(400, { error: "invalid recording mbid" });
+
+            await db
+                .delete(userTrackRating)
+                .where(
+                    and(
+                        eq(userTrackRating.userId, user.id),
+                        eq(userTrackRating.recordingMbid, recordingMbid),
+                    ),
+                );
+
+            return { ok: true };
+        },
+        {
+            auth: true,
+            params: t.Object({ recordingMbid: t.String() }),
         },
     )
 
